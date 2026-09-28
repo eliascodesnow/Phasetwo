@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, MessageCircle, KeyRound, PackageOpen } from "lucide-react";
-import type { ChatMessage, CycleProfile, UserRole } from "../types";
+import type { ChatMessage, CycleProfile, UserRole } from "./types";
 import { buildSystemPrompt, carePackagePrompt, sendChatMessage } from "./src/lib/ai";
 import { currentCycleDay, phaseForDay } from "./src/lib/cycleUtils";
 

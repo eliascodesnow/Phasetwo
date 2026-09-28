@@ -5,7 +5,7 @@ import {
   cycleProgressPercent,
   nextPeriodEstimate,
   phaseForDay,
-} from "./lib/cycleUtils";
+} from "./cycleUtils";
 
 const PHASE_TONE: Record<PhaseInfo["key"], { bg: string; text: string; line: string }> = {
   menstrual: { bg: "bg-phase-menstrual-bg", text: "text-phase-menstrual-text", line: "#E11D48" },
@@ -72,7 +72,8 @@ export function CycleHeader({
   const phase = phaseForDay(day, profile.cycleLength);
   const progress = cycleProgressPercent(profile);
   const nextPeriod = nextPeriodEstimate(profile);
-  const tone = PHASE_TONE[phase.key];
+  const phaseKey = (phase?.key ?? "follicular") as keyof typeof PHASE_TONE;
+  const tone = PHASE_TONE[phaseKey];
   const label = ownerLabelOverride ?? profile.ownerLabel;
 
   return (

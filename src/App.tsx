@@ -11,7 +11,7 @@ import { SettingsDrawer } from "./components/SettingsDrawer";
 import { SymptomLogger } from "./components/SymptomLogger";
 import { getLocalUserId } from "./lib/symptoms";
 
-const ENV_API_KEY = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined) ?? "";
+const ENV_API_KEY = (import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined) ?? "";
 const SELF_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 export default function App() {
@@ -43,7 +43,7 @@ export default function App() {
   useEffect(() => storage.saveSettings(settings), [settings]);
   useEffect(() => storage.saveChat(messages), [messages]);
 
-  const effectiveApiKey = settings.geminiApiKey || ENV_API_KEY;
+  const effectiveApiKey = settings.openRouterApiKey || ENV_API_KEY;
   const showLdr = settings.role === "partner" && settings.ldrEnabled;
 
   return (
@@ -89,7 +89,7 @@ export default function App() {
       </main>
 
       <footer className="max-w-5xl mx-auto px-5 sm:px-8 py-8 text-xs text-zinc-400">
-        All data stays in this browser. Only chat messages are sent, directly to Google's Gemini API.
+        All data stays in this browser. Only chat messages are sent to the OpenRouter-backed assistant.
       </footer>
 
       <SettingsDrawer

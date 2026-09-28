@@ -36,7 +36,7 @@ export const defaultCycleProfile: CycleProfile = {
 
 export const defaultSettings: AppSettings = {
   role: "self",
-  geminiApiKey: "",
+  openRouterApiKey: "",
   ldrEnabled: false,
 };
 
@@ -47,7 +47,20 @@ export const storage = {
   loadTasks: () => read<Task[]>(KEYS.tasks, []),
   saveTasks: (v: Task[]) => write(KEYS.tasks, v),
 
-  loadSettings: () => read<AppSettings>(KEYS.settings, defaultSettings),
+  loadSettings: () => {
+    const legacySettings = read<AppSettings & { geminiApiKey?: string }>(KEYS.settings, defaultSettings);
+    const migratedSettings: AppSettings = {
+      ...defaultSettings,
+      ...legacySettings,
+      openRouterApiKey: legacySettings.openRouterApiKey ?? legacySettings.geminiApiKey ?? "",
+    };
+
+    if (legacySettings.geminiApiKey && !legacySettings.openRouterApiKey) {
+      write(KEYS.settings, migratedSettings);
+    }
+
+    return migratedSettings;
+  },
   saveSettings: (v: AppSettings) => write(KEYS.settings, v),
 
   loadChat: () => read<ChatMessage[]>(KEYS.chat, []),

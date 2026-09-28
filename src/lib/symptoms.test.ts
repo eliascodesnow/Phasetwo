@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultSettings } from "./storage";
 import { PAIN_LOCATION_LABELS, SYMPTOM_LABELS, buildSymptomLogMeta } from "./symptoms";
 
 describe("symptom labels", () => {
@@ -7,6 +8,16 @@ describe("symptom labels", () => {
     expect(PAIN_LOCATION_LABELS.lower_back).toBe("Lower back");
     expect(SYMPTOM_LABELS.cramps).toBe("Cramps");
     expect(SYMPTOM_LABELS.bloating).toBe("Bloating");
+  });
+});
+
+describe("ai provider settings", () => {
+  it("stores the OpenRouter API key field instead of the deprecated Gemini field", () => {
+    expect(defaultSettings).toMatchObject({
+      openRouterApiKey: "",
+      ldrEnabled: false,
+    });
+    expect("geminiApiKey" in defaultSettings).toBe(false);
   });
 });
 

@@ -46,6 +46,6 @@ export interface PhaseInfo {
 
 export interface AppSettings {
   role: UserRole;
-  geminiApiKey: string; // stored locally only
+  openRouterApiKey: string; // stored locally only
   ldrEnabled: boolean;
 }

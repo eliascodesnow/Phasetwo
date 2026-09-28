@@ -4,8 +4,8 @@ Cycle tracking, phase-adaptive task planning, and a partner advice bot — priva
 default, with an optional remote-sync mode for long-distance couples.
 
 Everything lives in your browser (`localStorage`). Nothing about your cycle, tasks,
-or notes is ever sent anywhere. The only network calls this app makes are to
-Google's Gemini API, and only when you send a chat message.
+or notes is ever sent anywhere. The AI chat uses OpenRouter, and only when you
+send a chat message.
 
 ## Running it locally
 
@@ -21,11 +21,11 @@ Open the URL it prints (usually `http://localhost:5173`).
 
 ## Setting up the AI assistant
 
-The advice bot needs a free Gemini API key:
+The advice bot needs an OpenRouter API key:
 
-1. Get one at [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
+1. Get one at [openrouter.ai/keys](https://openrouter.ai/keys).
 2. Easiest: open the app, click **Settings**, and paste the key into the
-   **Gemini API key** field. It's saved in your browser only.
+   **OpenRouter API key** field. It's saved in your browser only.
 3. Optional (for your own default, e.g. if you're setting this up for someone
    else): copy `.env.local.example` to `.env.local` and paste the key there.
    Anyone using the app can still override it from Settings.
