@@ -8,6 +8,8 @@ import { TaskPlanner } from "./components/TaskPlanner";
 import { AIAssistant } from "./components/AIAssistant";
 import { LDRModule } from "./components/LDRModule";
 import { SettingsDrawer } from "./components/SettingsDrawer";
+import { SymptomLogger } from "./components/SymptomLogger";
+import { getLocalUserId } from "./lib/symptoms";
 
 const ENV_API_KEY = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined) ?? "";
 const SELF_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -18,6 +20,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(storage.loadSettings());
   const [messages, setMessages] = useState<ChatMessage[]>(storage.loadChat());
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [userId] = useState(() => getLocalUserId());
 
   // On load, if a share code is in the URL, offer to import it as "her" profile.
   useEffect(() => {
@@ -66,6 +69,8 @@ export default function App() {
 
       <main className="max-w-5xl mx-auto px-5 sm:px-8 py-8 space-y-6">
         <CycleHeader profile={profile} />
+
+        {settings.role === "self" && <SymptomLogger profile={profile} userId={userId} />}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           <TaskPlanner profile={profile} tasks={tasks} onChange={setTasks} />
