@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, MessageCircle, KeyRound, PackageOpen } from "lucide-react";
 import type { ChatMessage, CycleProfile, UserRole } from "../types";
-import { buildSystemPrompt, carePackagePrompt, sendChatMessage } from "../lib/gemini";
+import { buildSystemPrompt, carePackagePrompt, sendChatMessage } from "../lib/ai";
 import { currentCycleDay, phaseForDay } from "../lib/cycleUtils";
 
 export function AIAssistant({
@@ -37,11 +37,6 @@ export function AIAssistant({
     const t = text.trim();
     if (!t || pending) return;
 
-    if (!apiKey) {
-      setError("Add your Gemini API key in Settings to start chatting.");
-      return;
-    }
-
     setError(null);
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: "user", text: t, createdAt: Date.now() };
     const nextMessages = [...messages, userMsg];
@@ -52,7 +47,6 @@ export function AIAssistant({
     try {
       const systemPrompt = buildSystemPrompt(profile, phase, day, role);
       const reply = await sendChatMessage({
-        apiKey,
         systemPrompt,
         history: messages,
         message: t,
@@ -67,9 +61,9 @@ export function AIAssistant({
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       setError(
-        msg === "MISSING_API_KEY"
-          ? "Add your Gemini API key in Settings to start chatting."
-          : "Couldn't reach the assistant. Check your API key and connection, then try again."
+        msg === "You've hit today's limit"
+          ? "You've hit today's limit."
+          : "Couldn't reach the assistant. Check your connection and try again."
       );
     } finally {
       setPending(false);
