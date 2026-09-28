@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import type { CycleProfile, PhaseInfo } from "../types";
+import type { CycleProfile, PhaseInfo } from "./types";
 import {
   currentCycleDay,
   cycleProgressPercent,
   nextPeriodEstimate,
   phaseForDay,
-} from "../lib/cycleUtils";
+} from "./lib/cycleUtils";
 
 const PHASE_TONE: Record<PhaseInfo["key"], { bg: string; text: string; line: string }> = {
   menstrual: { bg: "bg-phase-menstrual-bg", text: "text-phase-menstrual-text", line: "#E11D48" },
