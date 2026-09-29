@@ -1,10 +1,27 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { ArrowRight, Leaf, LoaderCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        element: HTMLElement,
+        options: {
+          sitekey: string;
+          callback: (token: string) => void;
+          "expired-callback": () => void;
+        },
+      ) => string;
+      reset: (widgetId?: string) => void;
+    };
+  }
+}
+
 type AuthMode = "login" | "signup";
 type ProfileState = "signed-out" | "checking" | "missing" | "complete" | "error";
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
 export function AuthGate({ children }: { children: (user: User) => ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -17,6 +34,34 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [notice, setNotice] = useState("");
+  const captchaContainerRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetId = useRef<string | undefined>(undefined);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const container = captchaContainerRef.current;
+    if (!container || !turnstileSiteKey) return;
+
+    const renderWidget = () => {
+      if (!window.turnstile) return;
+      turnstileWidgetId.current = window.turnstile.render(container, {
+        sitekey: turnstileSiteKey,
+        callback: (token) => setCaptchaToken(token),
+        "expired-callback": () => setCaptchaToken(null),
+      });
+    };
+
+    if (window.turnstile) {
+      renderWidget();
+      return;
+    }
+
+    const script = document.querySelector<HTMLScriptElement>(
+      'script[src*="challenges.cloudflare.com/turnstile"]',
+    );
+    script?.addEventListener("load", renderWidget);
+    return () => script?.removeEventListener("load", renderWidget);
+  }, []);
 
   useEffect(() => {
     if (!supabase) return;
@@ -77,26 +122,38 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
   async function submitCredentials(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
+    if (!captchaToken) {
+      setErrorMessage("Please complete the security check before continuing.");
+      return;
+    }
     setBusy(true);
     setErrorMessage("");
     setNotice("");
 
     try {
       if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        const { error } = await supabase.auth.signInWithOtp({
+          email: email.trim(),
+          options: { emailRedirectTo: window.location.origin, captchaToken },
+        });
         if (error) throw error;
+        setNotice("Check your email for a sign-in link.");
       } else {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: { emailRedirectTo: window.location.origin, captchaToken },
         });
         if (error) throw error;
         if (!data.session) {
           setNotice("Check your email to confirm your account, then return here to finish your profile.");
         }
       }
+      window.turnstile?.reset(turnstileWidgetId.current);
+      setCaptchaToken(null);
     } catch (authError) {
+      window.turnstile?.reset(turnstileWidgetId.current);
+      setCaptchaToken(null);
       setErrorMessage(authError instanceof Error ? authError.message : "Unable to authenticate.");
     } finally {
       setBusy(false);
@@ -248,21 +305,24 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
             className="mt-1.5 w-full rounded-md border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-sage"
           />
         </label>
-        <label className="block text-sm font-medium text-zinc-700">
-          Password
-          <input
-            type="password"
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            minLength={6}
-            required
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="mt-1.5 w-full rounded-md border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-sage"
-          />
-        </label>
+        <div ref={captchaContainerRef} />
+        {mode === "signup" && (
+          <label className="block text-sm font-medium text-zinc-700">
+            Password
+            <input
+              type="password"
+              autoComplete="new-password"
+              minLength={6}
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="mt-1.5 w-full rounded-md border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-sage"
+            />
+          </label>
+        )}
         <Feedback error={errorMessage} notice={notice} />
         <button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-md bg-sage-dark px-4 py-3 text-sm font-medium text-white hover:bg-sage disabled:opacity-60">
-          {busy ? "Please wait..." : mode === "login" ? "Log in" : "Create account"}
+          {busy ? "Please wait..." : mode === "login" ? "Email me a sign-in link" : "Create account"}
           <ArrowRight className="h-4 w-4" />
         </button>
       </form>
