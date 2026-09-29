@@ -1,16 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import type { ChatMessage, CycleProfile, PhaseInfo, UserRole } from "../types";
-
-function getSupabaseClient() {
-  const url = import.meta.env.VITE_SUPABASE_URL ?? "";
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
-
-  if (!url || !anonKey) {
-    return null;
-  }
-
-  return createClient(url, anonKey);
-}
+import { supabase } from "./supabase";
 
 export function buildSystemPrompt(
   profile: CycleProfile,
@@ -48,7 +37,6 @@ export async function sendChatMessage({
   message,
   requiresPlus = false,
 }: SendMessageParams): Promise<string> {
-  const supabase = getSupabaseClient();
   if (!supabase) {
     throw new Error("AI service is not configured. Add your Supabase environment variables.");
   }

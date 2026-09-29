@@ -1,6 +1,28 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("./supabase", () => ({ hasSupabaseConfig: false, supabase: null }));
+
 import { defaultSettings } from "./storage";
-import { PAIN_LOCATION_LABELS, SYMPTOM_LABELS, buildSymptomLogMeta } from "./symptoms";
+import { PAIN_LOCATION_LABELS, SYMPTOM_LABELS, buildSymptomLogMeta, fetchLogs, hasUserConsented, saveUserConsent, upsertLog } from "./symptoms";
+
+beforeEach(() => {
+  const store = new Map<string, string>();
+
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+      setItem: (key: string, value: string) => {
+        store.set(key, value);
+      },
+      removeItem: (key: string) => {
+        store.delete(key);
+      },
+      clear: () => {
+        store.clear();
+      },
+    },
+  });
+});
 
 describe("symptom labels", () => {
   it("exposes friendly labels for the available options", () => {
@@ -18,6 +40,31 @@ describe("ai provider settings", () => {
       ldrEnabled: false,
     });
     expect("geminiApiKey" in defaultSettings).toBe(false);
+  });
+});
+
+describe("local symptom fallback", () => {
+  it("stores consent and symptom logs in browser storage when Supabase is not configured", async () => {
+    const userId = "local-user-123";
+    const log = {
+      log_date: "2026-09-10",
+      cycle_day: 10,
+      phase: "follicular",
+      pain_score: 4,
+      pain_locations: ["lower_abdomen"],
+      symptoms: ["cramps"],
+      bleeding: "light",
+      impact: "some",
+      notes: "Better after a walk",
+    };
+
+    const saved = await upsertLog(userId, log);
+    expect(saved.user_id).toBe(userId);
+    expect((await fetchLogs(userId)).length).toBe(1);
+    expect(await hasUserConsented(userId)).toBe(false);
+
+    await saveUserConsent(userId, "v1");
+    expect(await hasUserConsented(userId)).toBe(true);
   });
 });
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarRange, HeartPulse, Loader2, ShieldCheck } from "lucide-react";
-import { buildEmptySymptomLog, buildSymptomLogMeta, fetchLogs, hasUserConsented, saveUserConsent, upsertLog, type PainLocation, type Symptom, type SymptomLog, IMPACT_LABELS, IMPACT_OPTIONS, PAIN_LOCATION_LABELS, PAIN_LOCATION_OPTIONS, SYMPTOM_LABELS, SYMPTOM_OPTIONS, BLEEDING_LABELS, BLEEDING_OPTIONS } from "../lib/symptoms";
+import { buildEmptySymptomLog, buildSymptomLogMeta, fetchLogs, hasRemoteSymptomStorage, hasUserConsented, saveUserConsent, upsertLog, type PainLocation, type Symptom, type SymptomLog, IMPACT_LABELS, IMPACT_OPTIONS, PAIN_LOCATION_LABELS, PAIN_LOCATION_OPTIONS, SYMPTOM_LABELS, SYMPTOM_OPTIONS, BLEEDING_LABELS, BLEEDING_OPTIONS } from "../lib/symptoms";
 import type { CycleProfile } from "../types";
 import { currentCycleDay, phaseForDay } from "../lib/cycleUtils";
 
@@ -45,6 +45,7 @@ function isSelected<T extends string>(values: T[] | undefined, value: T): boolea
 
 export function SymptomLogger({ profile, userId }: { profile: CycleProfile; userId: string }) {
   const todayKey = formatDateKey(new Date());
+  const remoteStorageEnabled = useMemo(() => hasRemoteSymptomStorage(), []);
   const [log, setLog] = useState<SymptomLog>(() => buildEmptySymptomLog(profile, todayKey));
   const [history, setHistory] = useState<SymptomLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +83,7 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
           bleeding: todayEntry.bleeding ?? "none",
           impact: todayEntry.impact ?? "none",
         });
-        setConsentGranted(hasConsent);
+        setConsentGranted(!remoteStorageEnabled || hasConsent);
       } catch (loadError) {
         if (!ignore) {
           setError(loadError instanceof Error ? loadError.message : "Unable to load symptom history.");
@@ -167,7 +168,7 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
   };
 
   async function handleSave() {
-    if (!consentGranted) {
+    if (remoteStorageEnabled && !consentGranted) {
       setConsentOpen(true);
       return;
     }

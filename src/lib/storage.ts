@@ -40,8 +40,15 @@ export const defaultSettings: AppSettings = {
   ldrEnabled: false,
 };
 
+export interface UserAppState {
+  cycleProfile: CycleProfile;
+  tasks: Task[];
+  appSettings: AppSettings;
+  chatMessages: ChatMessage[];
+}
+
 export const storage = {
-  loadCycle: () => read<CycleProfile>(KEYS.cycle, defaultCycleProfile),
+  loadCycle: () => ({ ...read<CycleProfile>(KEYS.cycle, defaultCycleProfile) }),
   saveCycle: (v: CycleProfile) => write(KEYS.cycle, v),
 
   loadTasks: () => read<Task[]>(KEYS.tasks, []),
@@ -66,3 +73,50 @@ export const storage = {
   loadChat: () => read<ChatMessage[]>(KEYS.chat, []),
   saveChat: (v: ChatMessage[]) => write(KEYS.chat, v),
 };
+
+const USER_STATE_PREFIX = "phasetwo:user-state:";
+const LEGACY_IMPORT_KEY = "phasetwo:legacy-state-imported";
+
+export function loadLocalAppState(userId: string): UserAppState {
+  const accountState = read<UserAppState | null>(`${USER_STATE_PREFIX}${userId}`, null);
+  if (accountState) {
+    return {
+      cycleProfile: { ...defaultCycleProfile, ...accountState.cycleProfile },
+      tasks: accountState.tasks ?? [],
+      appSettings: { ...defaultSettings, ...accountState.appSettings },
+      chatMessages: accountState.chatMessages ?? [],
+    };
+  }
+
+  let canImportLegacy = false;
+  try {
+    canImportLegacy = !localStorage.getItem(LEGACY_IMPORT_KEY);
+  } catch {
+    canImportLegacy = false;
+  }
+
+  if (!canImportLegacy) {
+    return {
+      cycleProfile: { ...defaultCycleProfile },
+      tasks: [],
+      appSettings: { ...defaultSettings },
+      chatMessages: [],
+    };
+  }
+
+  return {
+    cycleProfile: storage.loadCycle(),
+    tasks: storage.loadTasks(),
+    appSettings: storage.loadSettings(),
+    chatMessages: storage.loadChat(),
+  };
+}
+
+export function saveLocalAppState(userId: string, state: UserAppState): void {
+  write(`${USER_STATE_PREFIX}${userId}`, state);
+  try {
+    if (!localStorage.getItem(LEGACY_IMPORT_KEY)) localStorage.setItem(LEGACY_IMPORT_KEY, userId);
+  } catch {
+    // Local persistence can be unavailable in restricted browser contexts.
+  }
+}

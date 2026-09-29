@@ -1,6 +1,6 @@
-import { createClient } from "@supabase/supabase-js";
 import type { CycleProfile, Phase } from "../types";
 import { currentCycleDay, phaseForDay } from "./cycleUtils";
+import { hasSupabaseConfig, supabase } from "./supabase";
 
 export type PainLocation =
   | "lower_abdomen"
@@ -148,26 +148,43 @@ export function buildEmptySymptomLog(
   };
 }
 
-function getSupabaseClient() {
-  const url = import.meta.env.VITE_SUPABASE_URL ?? "";
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
+export function hasRemoteSymptomStorage(): boolean {
+  return hasSupabaseConfig;
+}
 
-  if (!url || !anonKey) {
-    return null;
+function readLocalStorage<T>(key: string, fallback: T): T {
+  try {
+    const raw = globalThis.localStorage?.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
   }
+}
 
-  return createClient(url, anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
+function writeLocalStorage<T>(key: string, value: T): void {
+  try {
+    globalThis.localStorage?.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage failures and continue in memory.
+  }
+}
+
+function getSupabaseClient() {
+  return hasRemoteSymptomStorage() ? supabase : null;
 }
 
 export async function fetchLogs(userId: string, sinceDate?: string | Date): Promise<SymptomLog[]> {
   const client = getSupabaseClient();
-  if (!userId || !client) {
+  if (!userId) {
     return [];
+  }
+
+  if (!client) {
+    const fromDate = sinceDate ? formatDateKey(sinceDate) : "1970-01-01";
+    const storageKey = `phasetwo:symptom-logs:${userId}`;
+    const logs = readLocalStorage<SymptomLog[]>(storageKey, []);
+    return logs.filter((log) => log.log_date >= fromDate).sort((a, b) => b.log_date.localeCompare(a.log_date));
   }
 
   const fromDate = sinceDate ? formatDateKey(sinceDate) : "1970-01-01";
@@ -187,8 +204,8 @@ export async function fetchLogs(userId: string, sinceDate?: string | Date): Prom
 
 export async function upsertLog(userId: string, log: Partial<SymptomLog>): Promise<SymptomLog> {
   const client = getSupabaseClient();
-  if (!userId || !client) {
-    throw new Error("Supabase client is not configured for symptom logging.");
+  if (!userId) {
+    throw new Error("A user id is required to save a symptom log.");
   }
 
   const payload: Partial<SymptomLog> = {
@@ -205,6 +222,15 @@ export async function upsertLog(userId: string, log: Partial<SymptomLog>): Promi
     notes: log.notes?.trim() ? log.notes.trim() : null,
   };
 
+  if (!client) {
+    const storageKey = `phasetwo:symptom-logs:${userId}`;
+    const current = readLocalStorage<SymptomLog[]>(storageKey, []);
+    const updated = [...current.filter((entry) => entry.log_date !== payload.log_date), payload as SymptomLog];
+    updated.sort((a, b) => b.log_date.localeCompare(a.log_date));
+    writeLocalStorage(storageKey, updated);
+    return payload as SymptomLog;
+  }
+
   const { data, error } = await client
     .from("symptom_logs")
     .upsert(payload, { onConflict: "user_id,log_date" })
@@ -220,8 +246,20 @@ export async function upsertLog(userId: string, log: Partial<SymptomLog>): Promi
 
 export async function saveUserConsent(userId: string, policyVersion = "v1"): Promise<void> {
   const client = getSupabaseClient();
-  if (!userId || !client) {
-    throw new Error("Supabase client is not configured for consent storage.");
+  if (!userId) {
+    return;
+  }
+
+  if (!client) {
+    const storageKey = "phasetwo:user-consents";
+    const current = readLocalStorage<Record<string, { user_id: string; policy_version: string; health_data_consent_at: string }>>(storageKey, {});
+    current[userId] = {
+      user_id: userId,
+      policy_version: policyVersion,
+      health_data_consent_at: new Date().toISOString(),
+    };
+    writeLocalStorage(storageKey, current);
+    return;
   }
 
   const { error } = await client.from("user_consents").upsert(
@@ -240,8 +278,14 @@ export async function saveUserConsent(userId: string, policyVersion = "v1"): Pro
 
 export async function hasUserConsented(userId: string): Promise<boolean> {
   const client = getSupabaseClient();
-  if (!userId || !client) {
+  if (!userId) {
     return false;
+  }
+
+  if (!client) {
+    const storageKey = "phasetwo:user-consents";
+    const consent = readLocalStorage<Record<string, { user_id: string }>>(storageKey, {});
+    return Boolean(consent[userId]?.user_id);
   }
 
   const { data, error } = await client
