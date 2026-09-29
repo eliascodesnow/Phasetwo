@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("./supabase", () => ({ hasSupabaseConfig: false, supabase: null }));
 
 import { defaultSettings } from "./storage";
+import type { SymptomLog } from "./symptoms";
 import { PAIN_LOCATION_LABELS, SYMPTOM_LABELS, buildSymptomLogMeta, fetchLogs, hasUserConsented, saveUserConsent, upsertLog } from "./symptoms";
 
 beforeEach(() => {
@@ -46,7 +47,7 @@ describe("ai provider settings", () => {
 describe("local symptom fallback", () => {
   it("stores consent and symptom logs in browser storage when Supabase is not configured", async () => {
     const userId = "local-user-123";
-    const log = {
+    const log: Partial<SymptomLog> = {
       log_date: "2026-09-10",
       cycle_day: 10,
       phase: "follicular",
