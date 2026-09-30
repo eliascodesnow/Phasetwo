@@ -115,7 +115,7 @@ function WorkspaceApp({ userId }: { userId: string }) {
   return (
     <div className="min-h-screen bg-base">
       <header className="border-b border-zinc-200 bg-white/80 backdrop-saturate-150 sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 sm:px-10 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Leaf className="w-4.5 h-4.5 text-sage" strokeWidth={1.75} />
             <span className="font-display text-base font-semibold tracking-tight text-zinc-900">
@@ -142,7 +142,7 @@ function WorkspaceApp({ userId }: { userId: string }) {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-5 sm:px-8 py-8 space-y-6">
+      <main className="max-w-6xl mx-auto px-6 sm:px-10 py-9 space-y-6">
         <CycleHeader profile={profile} />
 
         {settings.role === "self" && <SymptomLogger profile={profile} userId={userId} />}
@@ -163,7 +163,7 @@ function WorkspaceApp({ userId }: { userId: string }) {
         {showLdr && <LDRModule profile={profile} selfTimezone={SELF_TIMEZONE} />}
       </main>
 
-      <footer className="max-w-5xl mx-auto px-5 sm:px-8 py-8 text-xs text-zinc-400">
+      <footer className="max-w-6xl mx-auto px-6 sm:px-10 py-8 text-xs text-zinc-400">
         Your cycle, plans, and chat history sync to your account. API keys stay on this device.
         {syncError && <span role="status" className="ml-2 text-red-700">Sync issue: {syncError}</span>}
       </footer>
