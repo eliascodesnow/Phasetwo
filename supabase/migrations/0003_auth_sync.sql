@@ -1,30 +1,36 @@
-create table if not exists public.profiles (
-  id uuid primary key references auth.users (id) on delete cascade,
-  display_name text not null check (char_length(trim(display_name)) between 1 and 80),
-  completed_at timestamptz not null default now(),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
+    display_name text NOT NULL CHECK (
+        char_length(trim(display_name)) BETWEEN 1 AND 80
+    ),
+    completed_at timestamptz NOT NULL DEFAULT now(),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-alter table public.profiles enable row level security;
+ALTER TABLE public.profiles enable ROW level security;
 
-drop policy if exists "profiles_select_own" on public.profiles;
-create policy "profiles_select_own" on public.profiles
-  for select to authenticated
-  using (id = auth.uid());
+DROP policy IF EXISTS "profiles_select_own" ON public.profiles;
 
-drop policy if exists "profiles_insert_own" on public.profiles;
-create policy "profiles_insert_own" on public.profiles
-  for insert to authenticated
-  with check (id = auth.uid());
+CREATE policy "profiles_select_own" ON public.profiles FOR
+SELECT TO authenticated USING (id = auth.uid ());
 
-drop policy if exists "profiles_update_own" on public.profiles;
-create policy "profiles_update_own" on public.profiles
-  for update to authenticated
-  using (id = auth.uid())
-  with check (id = auth.uid());
+DROP policy IF EXISTS "profiles_insert_own" ON public.profiles;
 
-grant select, insert, update on public.profiles to authenticated;
+CREATE policy "profiles_insert_own" ON public.profiles FOR
+INSERT
+    TO authenticated
+WITH
+    CHECK (id = auth.uid ());
+
+DROP policy IF EXISTS "profiles_update_own" ON public.profiles;
+
+CREATE policy "profiles_update_own" ON public.profiles FOR
+UPDATE TO authenticated USING (id = auth.uid ())
+WITH
+    CHECK (id = auth.uid ());
+
+GRANT SELECT, INSERT , UPDATE ON public.profiles TO authenticated;
 
 create table if not exists public.user_app_state (
   user_id uuid primary key references auth.users (id) on delete cascade,
@@ -35,22 +41,30 @@ create table if not exists public.user_app_state (
   updated_at timestamptz not null default now()
 );
 
-alter table public.user_app_state enable row level security;
+ALTER TABLE public.user_app_state enable ROW level security;
 
-drop policy if exists "user_app_state_select_own" on public.user_app_state;
-create policy "user_app_state_select_own" on public.user_app_state
-  for select to authenticated
-  using (user_id = auth.uid());
+DROP policy IF EXISTS "user_app_state_select_own" ON public.user_app_state;
 
-drop policy if exists "user_app_state_insert_own" on public.user_app_state;
-create policy "user_app_state_insert_own" on public.user_app_state
-  for insert to authenticated
-  with check (user_id = auth.uid());
+CREATE policy "user_app_state_select_own" ON public.user_app_state FOR
+SELECT TO authenticated USING (user_id = auth.uid ());
 
-drop policy if exists "user_app_state_update_own" on public.user_app_state;
-create policy "user_app_state_update_own" on public.user_app_state
-  for update to authenticated
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+DROP policy IF EXISTS "user_app_state_insert_own" ON public.user_app_state;
 
-grant select, insert, update on public.user_app_state to authenticated;
+CREATE policy "user_app_state_insert_own" ON public.user_app_state FOR
+INSERT
+    TO authenticated
+WITH
+    CHECK (user_id = auth.uid ());
+
+DROP policy IF EXISTS "user_app_state_update_own" ON public.user_app_state;
+
+CREATE policy "user_app_state_update_own" ON public.user_app_state FOR
+UPDATE TO authenticated USING (user_id = auth.uid ())
+WITH
+    CHECK (user_id = auth.uid ());
+
+GRANT
+SELECT,
+INSERT
+,
+UPDATE ON public.user_app_state TO authenticated;
