@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarRange, HeartPulse, Loader2, ShieldCheck } from "lucide-react";
-import { buildEmptySymptomLog, buildSymptomLogMeta, fetchLogs, hasRemoteSymptomStorage, hasUserConsented, saveUserConsent, upsertLog, type PainLocation, type Symptom, type SymptomLog, IMPACT_LABELS, IMPACT_OPTIONS, PAIN_LOCATION_LABELS, PAIN_LOCATION_OPTIONS, SYMPTOM_LABELS, SYMPTOM_OPTIONS, BLEEDING_LABELS, BLEEDING_OPTIONS } from "../lib/symptoms";
+import { buildEmptySymptomLog, buildSymptomLogMeta, deleteAllSymptomLogs, fetchLogs, hasRemoteSymptomStorage, hasUserConsented, saveUserConsent, upsertLog, type PainLocation, type Symptom, type SymptomLog, IMPACT_AREA_LABELS, IMPACT_AREA_OPTIONS, IMPACT_LABELS, IMPACT_OPTIONS, PAIN_LOCATION_LABELS, PAIN_LOCATION_OPTIONS, SYMPTOM_LABELS, SYMPTOM_OPTIONS, BLEEDING_LABELS, BLEEDING_OPTIONS } from "../lib/symptoms";
 import type { CycleProfile } from "../types";
 import { currentCycleDay, phaseForDay } from "../lib/cycleUtils";
 
@@ -43,7 +43,7 @@ function isSelected<T extends string>(values: T[] | undefined, value: T): boolea
   return clampArray(values).includes(value);
 }
 
-export function SymptomLogger({ profile, userId }: { profile: CycleProfile; userId: string }) {
+export function SymptomLogger({ profile, userId, onHistoryChange }: { profile: CycleProfile; userId: string; onHistoryChange?: (logs: SymptomLog[]) => void }) {
   const todayKey = formatDateKey(new Date());
   const remoteStorageEnabled = useMemo(() => hasRemoteSymptomStorage(), []);
   const [log, setLog] = useState<SymptomLog>(() => buildEmptySymptomLog(profile, todayKey));
@@ -53,6 +53,10 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
   const [error, setError] = useState("");
   const [consentGranted, setConsentGranted] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
+
+  useEffect(() => {
+    onHistoryChange?.(history);
+  }, [history, onHistoryChange]);
 
   const phaseMeta = useMemo(
     () => phaseForDay(log.cycle_day || currentCycleDay(profile, new Date()), profile.cycleLength),
@@ -65,9 +69,8 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
     async function loadData() {
       setLoading(true);
       try {
-        const sinceDate = addDays(new Date(), -13);
         const [entries, hasConsent] = await Promise.all([
-          fetchLogs(userId, formatDateKey(sinceDate)),
+          fetchLogs(userId),
           hasUserConsented(userId),
         ]);
 
@@ -81,7 +84,9 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
           pain_locations: clampArray(todayEntry.pain_locations),
           symptoms: clampArray(todayEntry.symptoms),
           bleeding: todayEntry.bleeding ?? "none",
-          impact: todayEntry.impact ?? "none",
+          impact: todayEntry.impact === "some" ? "mild" : todayEntry.impact === "missed_activity" ? "significant" : todayEntry.impact ?? "none",
+          impact_areas: clampArray(todayEntry.impact_areas),
+          outside_period: todayEntry.outside_period ?? false,
         });
         setConsentGranted(!remoteStorageEnabled || hasConsent);
       } catch (loadError) {
@@ -133,6 +138,8 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
       symptoms: clampArray(log.symptoms),
       bleeding: log.bleeding ?? "none",
       impact: log.impact ?? "none",
+      impact_areas: clampArray(log.impact_areas),
+      outside_period: log.outside_period ?? false,
       notes: log.notes?.trim() || null,
     } as SymptomLog;
 
@@ -158,7 +165,7 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
         const filtered = prev.filter((entry) => entry.log_date !== payload.log_date);
         return [saved, ...filtered].sort((a, b) => b.log_date.localeCompare(a.log_date));
       });
-      setLog({ ...saved, notes: saved.notes ?? "", pain_locations: clampArray(saved.pain_locations), symptoms: clampArray(saved.symptoms), bleeding: saved.bleeding ?? "none", impact: saved.impact ?? "none" });
+      setLog({ ...saved, notes: saved.notes ?? "", pain_locations: clampArray(saved.pain_locations), symptoms: clampArray(saved.symptoms), bleeding: saved.bleeding ?? "none", impact: saved.impact ?? "none", impact_areas: clampArray(saved.impact_areas), outside_period: saved.outside_period ?? false });
     } catch (saveError) {
       setHistory((prev) => prev.filter((entry) => entry.log_date !== payload.log_date));
       setError(saveError instanceof Error ? saveError.message : "Unable to save your symptom check-in.");
@@ -187,6 +194,21 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
     }
   }
 
+  async function handleDeleteHistory() {
+    if (!window.confirm("Delete all symptom logs from your PhaseTwo history? This cannot be undone.")) return;
+    try {
+      setSaving(true);
+      await deleteAllSymptomLogs(userId);
+      setHistory([]);
+      setLog(buildEmptySymptomLog(profile, todayKey));
+      setError("");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete your symptom history.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const strip = useMemo(() => {
     const start = addDays(new Date(), -13);
     return Array.from({ length: 14 }, (_, index) => {
@@ -205,8 +227,8 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
             <HeartPulse className="h-4 w-4" strokeWidth={2.1} />
           </div>
           <div>
-            <p className="font-display text-lg font-semibold text-zinc-900">Symptom check-in</p>
-            <p className="text-xs text-zinc-500">Your daily pain snapshot</p>
+            <p className="font-display text-lg font-semibold text-zinc-900">Period & pain status</p>
+            <p className="text-xs text-zinc-500">Your daily menstrual-health check-in</p>
           </div>
         </div>
         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] ${PHASE_BADGE[phaseMeta.key]}`}>
@@ -293,6 +315,11 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
               </div>
             </div>
 
+            <label className="flex min-h-11 items-start gap-2 text-sm text-zinc-700">
+              <input type="checkbox" checked={log.outside_period === true} onChange={(event) => updateLog("outside_period", event.target.checked)} className="mt-0.5 accent-[#4A6B5D]" />
+              Symptoms happened on a day I was not bleeding
+            </label>
+
             <div className="space-y-3">
               <p className="text-sm font-medium text-zinc-700">Bleeding</p>
               <div className="flex flex-wrap gap-2">
@@ -312,7 +339,7 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
 
             <div className="space-y-3">
               <p className="text-sm font-medium text-zinc-700">Did it get in the way of your day?</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {IMPACT_OPTIONS.map((option) => (
                   <button
                     key={option}
@@ -324,6 +351,20 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
                     {IMPACT_LABELS[option]}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-zinc-700">What areas of life were affected? <span className="font-normal text-zinc-400">(Optional)</span></p>
+              <div className="flex flex-wrap gap-2">
+                {IMPACT_AREA_OPTIONS.map((area) => {
+                  const selected = clampArray(log.impact_areas).includes(area);
+                  return (
+                    <button key={area} type="button" aria-pressed={selected} onClick={() => updateLog("impact_areas", selected ? clampArray(log.impact_areas).filter((item) => item !== area) : [...clampArray(log.impact_areas), area])} className={`min-h-[42px] rounded-full border px-3 py-2 text-sm ${selected ? "border-sage bg-sage-light text-sage-dark" : "border-zinc-200 bg-white text-zinc-600"}`}>
+                      {IMPACT_AREA_LABELS[area]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -372,16 +413,14 @@ export function SymptomLogger({ profile, userId }: { profile: CycleProfile; user
             <div className="flex items-center justify-between gap-3 pt-2">
               <div className="flex items-center gap-2 text-xs text-zinc-500">
                 <ShieldCheck className="h-4 w-4 text-sage" strokeWidth={2.1} />
-                Stored only for your cycle log
+                Private to your account; not used for advertising
               </div>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-sage px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : "Save today"}
-              </button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button type="button" onClick={() => void handleDeleteHistory()} disabled={saving || history.length === 0} className="min-h-[44px] rounded-xl border border-zinc-200 px-3 py-2.5 text-xs font-medium text-zinc-600 disabled:opacity-50">Delete symptom history</button>
+                <button type="button" onClick={handleSave} disabled={saving} className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-sage px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-70">
+                  {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : "Save today"}
+                </button>
+              </div>
             </div>
           </div>
         </>

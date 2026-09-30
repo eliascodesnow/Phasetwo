@@ -24,6 +24,8 @@ export type Symptom =
   | "brain_fog"
   | "acne"
   | "anxiety"
+  | "bowel_pain"
+  | "urination_pain"
   | "other";
 
 export type Bleeding = "none" | "light" | "medium" | "heavy";
@@ -83,6 +85,8 @@ export const SYMPTOM_OPTIONS: Symptom[] = [
   "brain_fog",
   "acne",
   "anxiety",
+  "bowel_pain",
+  "urination_pain",
   "other",
 ];
 
@@ -98,6 +102,8 @@ export const SYMPTOM_LABELS: Record<Symptom, string> = {
   brain_fog: "Brain fog",
   acne: "Breakouts",
   anxiety: "Anxiety",
+  bowel_pain: "Pain with bowel movements",
+  urination_pain: "Pain with urination",
   other: "Other",
 };
 
@@ -110,6 +116,15 @@ export const BLEEDING_LABELS: Record<Bleeding, string> = {
 };
 
 export const IMPACT_OPTIONS: Impact[] = ["none", "mild", "moderate", "significant", "unable"];
+export const IMPACT_AREA_OPTIONS: ImpactArea[] = ["school", "work", "exercise", "sleep", "social", "responsibilities"];
+export const IMPACT_AREA_LABELS: Record<ImpactArea, string> = {
+  school: "School",
+  work: "Work",
+  exercise: "Exercise",
+  sleep: "Sleep",
+  social: "Social activities",
+  responsibilities: "Daily responsibilities",
+};
 export const IMPACT_LABELS: Record<Impact, string> = {
   none: "No impact",
   mild: "Mild disruption",
@@ -129,6 +144,7 @@ export interface SymptomPatternSummary {
 
 const BOWEL_OR_URINARY_SYMPTOMS = new Set(["bowel_pain", "urination_pain"]);
 const GASTROINTESTINAL_SYMPTOMS = new Set(["bloating", "nausea", ...BOWEL_OR_URINARY_SYMPTOMS]);
+const PELVIC_PAIN_LOCATIONS = new Set(["lower_abdomen", "ovaries", "hips", "pelvic_pressure"]);
 
 function isMeaningfulImpact(impact: Impact): boolean {
   return ["moderate", "significant", "unable", "missed_activity"].includes(impact);
@@ -168,11 +184,11 @@ export function analyzeSymptomPatterns(
     { label: "heavy bleeding", test: (entry: SymptomLog) => entry.bleeding === "heavy" },
     {
       label: "symptoms outside bleeding days",
-      test: (entry: SymptomLog) => entry.outside_period === true && (entry.pain_score >= 4 || entry.symptoms.length > 0),
+      test: (entry: SymptomLog) => entry.outside_period === true && entry.pain_score >= 4 && (entry.pain_locations ?? []).some((location) => PELVIC_PAIN_LOCATIONS.has(location)),
     },
     {
       label: "digestive, bowel, or urinary symptoms",
-      test: (entry: SymptomLog) => entry.symptoms.some((symptom) => GASTROINTESTINAL_SYMPTOMS.has(symptom)),
+      test: (entry: SymptomLog) => (entry.symptoms ?? []).some((symptom) => GASTROINTESTINAL_SYMPTOMS.has(symptom)),
     },
   ];
 
@@ -180,8 +196,29 @@ export function analyzeSymptomPatterns(
     if (repeated(indicator.test) >= 2) patterns.push(indicator.label);
   }
 
+  const averagePainByCycle = cycles.map((entries) =>
+    entries.reduce((total, entry) => total + entry.pain_score, 0) / Math.max(1, entries.length)
+  );
+  if (averagePainByCycle[0] >= averagePainByCycle[1] && averagePainByCycle[0] - averagePainByCycle[2] >= 2) {
+    patterns.push("pain increasing over the reviewed cycles");
+  }
+
+  const impactRank: Record<Impact, number> = {
+    none: 0,
+    mild: 1,
+    some: 1,
+    moderate: 2,
+    significant: 3,
+    missed_activity: 3,
+    unable: 4,
+  };
+  const maximumImpactByCycle = cycles.map((entries) => Math.max(0, ...entries.map((entry) => impactRank[entry.impact] ?? 0)));
+  if (maximumImpactByCycle[0] >= maximumImpactByCycle[1] && maximumImpactByCycle[0] - maximumImpactByCycle[2] >= 2) {
+    patterns.push("daily-life disruption increasing over the reviewed cycles");
+  }
+
   const recurringCycles = cycles.filter((entries) =>
-    recurringIndicators.some((indicator) => entries.some(indicator.test))
+    entries.some((entry) => entry.pain_score > 0 || (entry.symptoms ?? []).length > 0 || isMeaningfulImpact(entry.impact))
   ).length;
 
   if (patterns.length >= 2) patterns.push("more than one recurring symptom pattern");
@@ -269,18 +306,23 @@ export async function fetchLogs(userId: string, sinceDate?: string | Date): Prom
   }
 
   const fromDate = sinceDate ? formatDateKey(sinceDate) : "1970-01-01";
-  const { data, error } = await client
-    .from("symptom_logs")
-    .select("*")
-    .eq("user_id", userId)
-    .gte("log_date", fromDate)
-    .order("log_date", { ascending: false });
+  const logs: SymptomLog[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await client
+      .from("symptom_logs")
+      .select("*")
+      .eq("user_id", userId)
+      .gte("log_date", fromDate)
+      .order("log_date", { ascending: false })
+      .range(offset, offset + pageSize - 1);
 
-  if (error) {
-    throw error;
+    if (error) throw error;
+    logs.push(...((data ?? []) as SymptomLog[]));
+    if (!data || data.length < pageSize) break;
   }
 
-  return (data ?? []) as SymptomLog[];
+  return logs;
 }
 
 export async function upsertLog(userId: string, log: Partial<SymptomLog>): Promise<SymptomLog> {
@@ -300,6 +342,8 @@ export async function upsertLog(userId: string, log: Partial<SymptomLog>): Promi
     symptoms: log.symptoms ?? [],
     bleeding: log.bleeding ?? null,
     impact: log.impact ?? "none",
+    impact_areas: log.impact_areas ?? [],
+    outside_period: log.outside_period ?? false,
     notes: log.notes?.trim() ? log.notes.trim() : null,
   };
 
@@ -323,6 +367,23 @@ export async function upsertLog(userId: string, log: Partial<SymptomLog>): Promi
   }
 
   return (data ?? payload) as SymptomLog;
+}
+
+export async function deleteAllSymptomLogs(userId: string): Promise<void> {
+  if (!userId) throw new Error("A user id is required to delete symptom history.");
+
+  const client = getSupabaseClient();
+  if (!client) {
+    try {
+      globalThis.localStorage?.removeItem(`phasetwo:symptom-logs:${userId}`);
+    } catch {
+      throw new Error("Unable to access local symptom storage.");
+    }
+    return;
+  }
+
+  const { error } = await client.from("symptom_logs").delete().eq("user_id", userId);
+  if (error) throw error;
 }
 
 export async function saveUserConsent(userId: string, policyVersion = "v1"): Promise<void> {

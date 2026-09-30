@@ -123,6 +123,13 @@ export function CycleHeader({
       <p className="mt-5 text-sm leading-relaxed text-zinc-600 border-t border-zinc-100 pt-4">
         {phase.summary}
       </p>
+
+      {profile.periodStartDates && profile.periodStartDates.length > 0 && (
+        <div className="mt-3 text-xs leading-relaxed text-zinc-500">
+          <p>{profile.periodStartDates.length} period starts recorded · Cycle length uses the average of up to six recorded intervals.</p>
+          <p className="mt-1">Recent starts: {profile.periodStartDates.slice(-6).reverse().join(", ")}</p>
+        </div>
+      )}
     </section>
   );
 }

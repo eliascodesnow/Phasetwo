@@ -120,3 +120,18 @@ export function saveLocalAppState(userId: string, state: UserAppState): void {
     // Local persistence can be unavailable in restricted browser contexts.
   }
 }
+
+export function clearLocalUserData(userId: string): void {
+  try {
+    localStorage.removeItem(`${USER_STATE_PREFIX}${userId}`);
+    localStorage.removeItem(`phasetwo:symptom-logs:${userId}`);
+    const rawConsents = localStorage.getItem("phasetwo:user-consents");
+    if (rawConsents) {
+      const consents = JSON.parse(rawConsents) as Record<string, unknown>;
+      delete consents[userId];
+      localStorage.setItem("phasetwo:user-consents", JSON.stringify(consents));
+    }
+  } catch {
+    throw new Error("Your account was deleted, but some browser-stored data could not be cleared. Clear this site's data in your browser settings.");
+  }
+}

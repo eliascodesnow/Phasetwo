@@ -20,13 +20,11 @@ declare global {
 }
 
 type AuthMode = "login" | "signup";
-type ProfileState = "signed-out" | "checking" | "missing" | "complete" | "error";
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
 export function AuthGate({ children }: { children: (user: User) => ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
-  const [profileState, setProfileState] = useState<ProfileState>("signed-out");
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -68,7 +66,6 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
-      setProfileState(nextSession ? "checking" : "signed-out");
       setErrorMessage("");
     });
 
@@ -76,48 +73,10 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
       if (error) setErrorMessage(error.message);
       setSession(data.session);
       setAuthReady(true);
-      setProfileState(data.session ? "checking" : "signed-out");
     });
 
     return () => subscription.unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (!supabase || !session?.user) {
-      setProfileState("signed-out");
-      return;
-    }
-
-    let ignore = false;
-    const user = session.user;
-    const metadataName = user.user_metadata.full_name ?? user.user_metadata.name ?? "";
-    setDisplayName((current) => current || metadataName);
-    setProfileState("checking");
-
-    void supabase
-      .from("profiles")
-      .select("display_name")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (ignore) return;
-        if (error) {
-          setErrorMessage(error.message);
-          setProfileState("error");
-          return;
-        }
-        if (data?.display_name?.trim()) {
-          setDisplayName(data.display_name);
-          setProfileState("complete");
-        } else {
-          setProfileState("missing");
-        }
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [session?.user.id]);
 
   async function submitCredentials(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -177,31 +136,6 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
     }
   }
 
-  async function saveProfile(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!supabase || !session?.user) return;
-    const name = displayName.trim();
-    if (!name) {
-      setErrorMessage("Enter your name to create your profile.");
-      return;
-    }
-
-    setBusy(true);
-    setErrorMessage("");
-    const { error } = await supabase.from("profiles").upsert({
-      id: session.user.id,
-      display_name: name,
-      completed_at: new Date().toISOString(),
-    });
-    setBusy(false);
-
-    if (error) {
-      setErrorMessage(error.message);
-      return;
-    }
-    setProfileState("complete");
-  }
-
   async function signOut() {
     if (!supabase) return;
     await supabase.auth.signOut();
@@ -220,52 +154,18 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
     );
   }
 
-  if (!authReady || (session && profileState === "checking")) {
+  if (!authReady) {
     return (
       <AuthLayout>
         <div className="flex items-center gap-3 text-sm text-zinc-600">
           <LoaderCircle className="h-4 w-4 animate-spin text-sage" />
-          Checking your account...
+          Loading PhaseTwo...
         </div>
       </AuthLayout>
     );
   }
 
-  if (profileState === "complete" && session) {
-    return <>{children(session.user)}</>;
-  }
-
-  if (session && (profileState === "missing" || profileState === "error")) {
-    return (
-      <AuthLayout>
-        <button type="button" onClick={signOut} className="mb-8 text-xs text-zinc-500 hover:text-zinc-800">
-          Sign out
-        </button>
-        <p className="text-xs font-medium uppercase text-sage-dark">Your profile</p>
-        <h1 className="mt-2 font-display text-2xl font-semibold text-zinc-900">A name to start with</h1>
-        <p className="mt-2 text-sm leading-6 text-zinc-600">Create your profile before continuing to your private workspace.</p>
-        <form onSubmit={saveProfile} className="mt-7 space-y-4">
-          <label className="block text-sm font-medium text-zinc-700">
-            Display name
-            <input
-              autoComplete="name"
-              autoFocus
-              required
-              maxLength={80}
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              className="mt-1.5 w-full rounded-md border border-zinc-300 bg-white px-3 py-2.5 text-sm focus:border-sage"
-            />
-          </label>
-          <Feedback error={errorMessage} notice={notice} />
-          <button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-md bg-sage-dark px-4 py-3 text-sm font-medium text-white hover:bg-sage disabled:opacity-60">
-            {busy ? "Saving..." : "Create profile"}
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </form>
-      </AuthLayout>
-    );
-  }
+  if (session) return <>{children(session.user)}</>;
 
   return (
     <AuthLayout>

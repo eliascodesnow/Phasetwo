@@ -66,6 +66,28 @@ export function currentPhase(profile: CycleProfile, asOf: Date = new Date()): Ph
   return phaseForDay(day, profile.cycleLength || 28);
 }
 
+export function recordPeriodStart(profile: CycleProfile, date: string): CycleProfile {
+  const starts = [...new Set([...(profile.periodStartDates ?? []), profile.lastPeriodStart, date])]
+    .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+    .sort((left, right) => left.localeCompare(right));
+  const intervals = starts.slice(1).map((start, index) => {
+    const previous = new Date(`${starts[index]}T12:00:00`);
+    const current = new Date(`${start}T12:00:00`);
+    return Math.round((current.getTime() - previous.getTime()) / MS_PER_DAY);
+  }).filter((days) => days >= 20 && days <= 45);
+  const recentIntervals = intervals.slice(-6);
+  const cycleLength = recentIntervals.length
+    ? Math.round(recentIntervals.reduce((total, days) => total + days, 0) / recentIntervals.length)
+    : profile.cycleLength;
+
+  return {
+    ...profile,
+    lastPeriodStart: starts[starts.length - 1] ?? date,
+    periodStartDates: starts.slice(-24),
+    cycleLength,
+  };
+}
+
 export function cycleProgressPercent(profile: CycleProfile, asOf: Date = new Date()): number {
   const day = currentCycleDay(profile, asOf);
   return Math.round((day / (profile.cycleLength || 28)) * 100);

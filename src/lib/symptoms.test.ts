@@ -3,7 +3,7 @@ vi.mock("./supabase", () => ({ hasSupabaseConfig: false, supabase: null }));
 
 import { defaultSettings } from "./storage";
 import type { SymptomLog } from "./symptoms";
-import { PAIN_LOCATION_LABELS, SYMPTOM_LABELS, buildSymptomLogMeta, fetchLogs, hasUserConsented, saveUserConsent, upsertLog } from "./symptoms";
+import { analyzeSymptomPatterns, PAIN_LOCATION_LABELS, SYMPTOM_LABELS, buildSymptomLogMeta, fetchLogs, hasUserConsented, saveUserConsent, upsertLog, type SymptomLog } from "./symptoms";
 
 beforeEach(() => {
   const store = new Map<string, string>();
@@ -102,5 +102,57 @@ describe("symptom date auto-fill", () => {
     expect(result.log_date).toBe("2026-09-23");
     expect(result.cycle_day).toBe(23);
     expect(result.phase).toBe("luteal");
+  });
+});
+
+describe("multi-cycle symptom pattern review", () => {
+  const profile = {
+    lastPeriodStart: "2026-09-01",
+    cycleLength: 28,
+    periodLength: 5,
+    ownerLabel: "You",
+    timezone: "UTC",
+    city: "Berlin",
+  };
+
+  function entry(logDate: string, painScore: number): SymptomLog {
+    return {
+      log_date: logDate,
+      cycle_day: 2,
+      phase: "menstrual",
+      pain_score: painScore,
+      pain_locations: [],
+      symptoms: [],
+      bleeding: "medium",
+      impact: "none",
+    };
+  }
+
+  it("does not recommend evaluation from a single recorded cycle", () => {
+    const result = analyzeSymptomPatterns([entry("2026-09-02", 9)], profile);
+
+    expect(result.cyclesReviewed).toBe(1);
+    expect(result.recommendEvaluation).toBe(false);
+  });
+
+  it("highlights repeated severe pain only after three cycles are recorded", () => {
+    const result = analyzeSymptomPatterns(
+      [entry("2026-09-02", 9), entry("2026-08-05", 8), entry("2026-07-08", 7)],
+      profile
+    );
+
+    expect(result.cyclesReviewed).toBe(3);
+    expect(result.patterns).toContain("high pain");
+    expect(result.recommendEvaluation).toBe(true);
+  });
+
+  it("highlights pain that is consistently worsening across three cycles", () => {
+    const result = analyzeSymptomPatterns(
+      [entry("2026-09-02", 7), entry("2026-08-05", 5), entry("2026-07-08", 3)],
+      profile
+    );
+
+    expect(result.patterns).toContain("pain increasing over the reviewed cycles");
+    expect(result.recommendEvaluation).toBe(true);
   });
 });

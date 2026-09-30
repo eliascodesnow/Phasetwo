@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X, ShieldCheck } from "lucide-react";
 import type { AppSettings, CycleProfile, UserRole } from "../types";
+import { MEDICAL_DISCLAIMER } from "../lib/endoContent";
 
 const TIMEZONES = Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone") : [];
 
@@ -66,6 +67,14 @@ export function SettingsDrawer({
                 <p className="text-xs text-zinc-400 mt-0.5">Remote sync, timezone bar, and care-package prompts.</p>
               </button>
             </div>
+          </div>
+
+          <div className="border-t border-zinc-100 pt-5">
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Health data and care</p>
+            <p className="text-xs leading-relaxed text-zinc-600">
+              Symptom history is stored in your account when remote storage is configured, or in this browser otherwise. It is not used for advertising. You can delete symptom history from the check-in screen. Your notes are not included in cycle-share links.
+            </p>
+            <p className="mt-3 text-xs leading-relaxed text-zinc-500">{MEDICAL_DISCLAIMER}</p>
           </div>
 
           {/* Cycle profile */}

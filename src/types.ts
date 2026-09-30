@@ -5,6 +5,8 @@ export type UserRole = "self" | "partner";
 export interface CycleProfile {
   /** ISO date (yyyy-mm-dd) of the most recent period start */
   lastPeriodStart: string;
+  /** Recorded period start dates used to calculate observed cycle intervals. */
+  periodStartDates?: string[];
   cycleLength: number; // default 28
   periodLength: number; // default 5, used for menstrual window
   /** Display name for the person whose cycle this is — "You" or her name */
