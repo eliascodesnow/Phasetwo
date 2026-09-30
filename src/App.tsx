@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarDays, FileText, HeartPulse, Home, LogOut, Leaf, Settings } from "lucide-react";
 import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
 import { defaultCycleProfile, defaultSettings } from "./lib/storage";
-import { readShareCodeFromUrl, clearShareParam } from "./lib/shareState";
 import { CycleHeader } from "./components/CycleHeader";
 import { TaskPlanner } from "./components/TaskPlanner";
 import { LDRModule } from "./components/LDRModule";
@@ -13,6 +12,7 @@ import { HistoryView } from "./components/HistoryView";
 import { ReportView } from "./components/ReportView";
 import { SettingsView } from "./components/SettingsView";
 import { PartnerAdviceLauncher } from "./components/PartnerAdviceLauncher";
+import { AskBellaLauncher } from "./components/AskBellaLauncher";
 import { AuthGate } from "./components/AuthGate";
 import { supabase } from "./lib/supabase";
 import { clearLocalUserData, loadLocalAppState, type UserAppState } from "./lib/storage";
@@ -20,7 +20,6 @@ import { loadSyncedAppState, saveSyncedAppState } from "./lib/userData";
 import { recordPeriodStart } from "./lib/cycleUtils";
 import type { SymptomLog } from "./lib/symptoms";
 
-const ENV_API_KEY = (import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined) ?? "";
 const SELF_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 type WorkspaceView = "home" | "history" | "report" | "settings";
 
@@ -39,10 +38,10 @@ function WorkspaceApp({ userId }: { userId: string }) {
   const [profile, setProfile] = useState<CycleProfile>(defaultCycleProfile);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [sharedCycleProfile, setSharedCycleProfile] = useState<CycleProfile | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [symptomLogs, setSymptomLogs] = useState<SymptomLog[]>([]);
   const [activeView, setActiveView] = useState<WorkspaceView>("home");
-  const [localKey, setLocalKey] = useState("");
   const [appReady, setAppReady] = useState(false);
   const [syncError, setSyncError] = useState("");
   const deletingAccount = useRef(false);
@@ -57,7 +56,6 @@ function WorkspaceApp({ userId }: { userId: string }) {
         setProfile(state.cycleProfile);
         setTasks(state.tasks);
         setSettings(state.appSettings);
-        setLocalKey(state.appSettings.openRouterApiKey);
         setMessages(state.chatMessages);
       })
       .catch((error: unknown) => {
@@ -66,7 +64,6 @@ function WorkspaceApp({ userId }: { userId: string }) {
         setProfile(localState.cycleProfile);
         setTasks(localState.tasks);
         setSettings(localState.appSettings);
-        setLocalKey(localState.appSettings.openRouterApiKey);
         setMessages(localState.chatMessages);
         setSyncError(error instanceof Error ? error.message : "Unable to load synced data.");
       })
@@ -79,21 +76,62 @@ function WorkspaceApp({ userId }: { userId: string }) {
     };
   }, [userId]);
 
-  // On load, if a share code is in the URL, offer to import it as "her" profile.
   useEffect(() => {
-    if (!appReady || deletingAccount.current) return;
-    const shared = readShareCodeFromUrl();
-    if (shared) {
-      const accept = window.confirm(
-        `This link shares ${shared.ownerLabel || "a"} cycle synced for Day tracking. Import it?`
-      );
-      if (accept) {
-        setProfile((p) => ({ ...p, ...shared }));
-        setSettings((s) => ({ ...s, role: "partner", ldrEnabled: true }));
-      }
-      clearShareParam();
-    }
+    if (!appReady || deletingAccount.current || !supabase) return;
+    const token = new URLSearchParams(window.location.search).get("cycleInvite");
+    if (!token) return;
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("cycleInvite");
+    window.history.replaceState({}, "", cleanUrl);
+    if (!window.confirm("Accept this private cycle invitation for your PhaseTwo account?")) return;
+
+    void supabase.functions.invoke("partner-invites", { body: { action: "accept", token } })
+      .then(async ({ error }) => {
+        if (error) throw error;
+        const { data, error: cycleError } = await supabase.rpc("get_my_shared_cycle_profile");
+        if (cycleError || !data) throw cycleError ?? new Error("Cycle sync is unavailable.");
+        const remote = data as Partial<CycleProfile>;
+        if (typeof remote.lastPeriodStart !== "string" || typeof remote.cycleLength !== "number") {
+          throw new Error("The invitation does not contain a valid cycle profile.");
+        }
+        setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "" });
+        setSettings((current) => ({ ...current, role: "partner", ldrEnabled: true }));
+        setSyncError("");
+      })
+      .catch(() => setSyncError("We couldn’t accept that invitation. Sign in with the invited email and try again."));
   }, [appReady]);
+
+  useEffect(() => {
+    if (!appReady || !supabase) return;
+
+    let ignore = false;
+    async function refreshSharedCycle() {
+      const { data, error } = await supabase!.rpc("get_my_shared_cycle_profile");
+      if (ignore) return;
+      if (error || !data || typeof data !== "object") {
+        setSharedCycleProfile(null);
+        setSettings((current) => current.role === "partner" ? { ...current, role: "self" } : current);
+        if (error && settings.role === "partner") setSyncError("Partner sync is temporarily unavailable. Your account data is unchanged.");
+        return;
+      }
+      const remote = data as Partial<CycleProfile>;
+      if (typeof remote.lastPeriodStart !== "string" || typeof remote.cycleLength !== "number") {
+        setSharedCycleProfile(null);
+        setSettings((current) => ({ ...current, role: "self" }));
+        return;
+      }
+      setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "" });
+    }
+
+    void refreshSharedCycle();
+    const interval = window.setInterval(() => void refreshSharedCycle(), 30_000);
+    window.addEventListener("focus", refreshSharedCycle);
+    return () => {
+      ignore = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshSharedCycle);
+    };
+  }, [appReady, settings.role]);
 
   useEffect(() => {
     if (!appReady) return;
@@ -140,8 +178,16 @@ function WorkspaceApp({ userId }: { userId: string }) {
     }
   }
 
-  const effectiveApiKey = settings.openRouterApiKey || ENV_API_KEY;
+  async function leavePartnerSync() {
+    if (!supabase) return;
+    const { error } = await supabase.rpc("leave_cycle_share");
+    if (error) throw error;
+    setSharedCycleProfile(null);
+    setSettings((current) => ({ ...current, role: "self" }));
+  }
+
   const showLdr = settings.role === "partner" && settings.ldrEnabled;
+  const displayedProfile = showLdr && sharedCycleProfile ? sharedCycleProfile : profile;
 
   if (!appReady) {
     return <div className="flex min-h-screen items-center justify-center text-sm text-zinc-500">Loading your workspace...</div>;
@@ -178,33 +224,34 @@ function WorkspaceApp({ userId }: { userId: string }) {
 
       <main className="max-w-6xl mx-auto space-y-7 px-4 py-6 pb-24 sm:px-8 sm:py-8">
         {activeView === "home" && <>
-          <CycleHeader profile={profile} />
-          <div className="mx-auto flex justify-center">
+          <CycleHeader profile={displayedProfile} />
+          {settings.role === "self" && <div className="mx-auto flex justify-center">
             <button type="button" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#b96070] px-7 py-3 text-sm font-semibold text-white shadow-card transition-colors hover:bg-[#a95263]">
               <HeartPulse className="h-4 w-4" />Record period
             </button>
-          </div>
-          <PeriodCalendar profile={profile} logs={settings.role === "self" ? symptomLogs : []} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} />
+          </div>}
+          <PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} />
           {settings.role === "self" && <SymptomLogger profile={profile} userId={userId} onHistoryChange={setSymptomLogs} />}
           <div className="grid grid-cols-1 gap-6 items-start lg:grid-cols-2">
-            <TaskPlanner profile={profile} tasks={tasks} onChange={setTasks} />
-            {showLdr && <LDRModule profile={profile} selfTimezone={SELF_TIMEZONE} />}
+            <TaskPlanner profile={displayedProfile} tasks={tasks} onChange={setTasks} />
+            {showLdr && <LDRModule profile={displayedProfile} selfTimezone={SELF_TIMEZONE} />}
           </div>
         </>}
 
-        {activeView === "history" && <HistoryView profile={profile} logs={settings.role === "self" ? symptomLogs : []} />}
-        {activeView === "report" && <ReportView profile={profile} logs={settings.role === "self" ? symptomLogs : []} />}
-        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} profile={profile} onProfileChange={setProfile} localKey={localKey} onLocalKeyChange={setLocalKey} hasEnvKey={Boolean(ENV_API_KEY)} onDeleteAccount={deleteAccount} />}
+        {activeView === "history" && <HistoryView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} />}
+        {activeView === "report" && <ReportView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} />}
+        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} />}
 
-        {activeView === "home" && <EndometriosisAwareness logs={settings.role === "self" ? symptomLogs : []} profile={profile} />}
+        {activeView === "home" && settings.role === "self" && <EndometriosisAwareness logs={symptomLogs} profile={profile} />}
       </main>
 
       <footer className="max-w-6xl mx-auto px-6 sm:px-10 py-8 text-xs text-zinc-400">
-        Your cycle, plans, and chat history sync to your account. API keys stay on this device.
+        Your cycle, plans, and symptom history stay in your account. Partner sync is invitation-only; Bella conversations stay in this session.
         {syncError && <span role="status" className="ml-2 text-red-700">Sync issue: {syncError}</span>}
       </footer>
 
-      {showLdr && <PartnerAdviceLauncher profile={profile} apiKey={effectiveApiKey} onRequestApiKey={() => setActiveView("settings")} messages={messages} onMessagesChange={setMessages} />}
+      {settings.role === "self" && <AskBellaLauncher />}
+      {showLdr && <PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} />}
     </div>
   );
 }

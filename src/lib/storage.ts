@@ -36,7 +36,6 @@ export const defaultCycleProfile: CycleProfile = {
 
 export const defaultSettings: AppSettings = {
   role: "self",
-  openRouterApiKey: "",
   ldrEnabled: false,
 };
 
@@ -55,18 +54,11 @@ export const storage = {
   saveTasks: (v: Task[]) => write(KEYS.tasks, v),
 
   loadSettings: () => {
-    const legacySettings = read<AppSettings & { geminiApiKey?: string }>(KEYS.settings, defaultSettings);
-    const migratedSettings: AppSettings = {
-      ...defaultSettings,
-      ...legacySettings,
-      openRouterApiKey: legacySettings.openRouterApiKey ?? legacySettings.geminiApiKey ?? "",
+    const saved = read<Partial<AppSettings>>(KEYS.settings, defaultSettings);
+    return {
+      role: saved.role === "partner" ? "partner" as const : "self" as const,
+      ldrEnabled: Boolean(saved.ldrEnabled),
     };
-
-    if (legacySettings.geminiApiKey && !legacySettings.openRouterApiKey) {
-      write(KEYS.settings, migratedSettings);
-    }
-
-    return migratedSettings;
   },
   saveSettings: (v: AppSettings) => write(KEYS.settings, v),
 
@@ -83,7 +75,10 @@ export function loadLocalAppState(userId: string): UserAppState {
     return {
       cycleProfile: { ...defaultCycleProfile, ...accountState.cycleProfile },
       tasks: accountState.tasks ?? [],
-      appSettings: { ...defaultSettings, ...accountState.appSettings },
+      appSettings: {
+        role: accountState.appSettings?.role === "partner" ? "partner" : "self",
+        ldrEnabled: Boolean(accountState.appSettings?.ldrEnabled),
+      },
       chatMessages: accountState.chatMessages ?? [],
     };
   }
@@ -107,7 +102,10 @@ export function loadLocalAppState(userId: string): UserAppState {
   return {
     cycleProfile: storage.loadCycle(),
     tasks: storage.loadTasks(),
-    appSettings: storage.loadSettings(),
+      appSettings: {
+        role: storage.loadSettings().role,
+        ldrEnabled: storage.loadSettings().ldrEnabled,
+      },
     chatMessages: storage.loadChat(),
   };
 }

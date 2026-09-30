@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, MessageCircle, KeyRound, PackageOpen } from "lucide-react";
+import { Send, MessageCircle, PackageOpen } from "lucide-react";
 import type { ChatMessage, CycleProfile, UserRole } from "../types";
 import { buildSystemPrompt, carePackagePrompt, sendChatMessage } from "../lib/ai";
 import { currentCycleDay, phaseForDay } from "../lib/cycleUtils";
@@ -7,16 +7,12 @@ import { currentCycleDay, phaseForDay } from "../lib/cycleUtils";
 export function AIAssistant({
   profile,
   role,
-  apiKey,
-  onRequestApiKey,
   messages,
   onChange,
   ldrEnabled,
 }: {
   profile: CycleProfile;
   role: UserRole;
-  apiKey: string;
-  onRequestApiKey: () => void;
   messages: ChatMessage[];
   onChange: (messages: ChatMessage[]) => void;
   ldrEnabled: boolean;
@@ -77,16 +73,6 @@ export function AIAssistant({
           <MessageCircle className="w-4 h-4 text-sage" strokeWidth={1.75} />
           <h3 className="font-display text-lg font-semibold text-zinc-900">Partner advice</h3>
         </div>
-        {!apiKey && (
-          <button
-            type="button"
-            onClick={onRequestApiKey}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700"
-          >
-            <KeyRound className="w-3.5 h-3.5" strokeWidth={1.75} />
-            Add API key
-          </button>
-        )}
       </div>
       <p className="text-xs text-zinc-400 mt-1">
         Grounded in Day {day} · {phase.label} phase{role === "partner" ? ` · ${profile.ownerLabel}` : ""}

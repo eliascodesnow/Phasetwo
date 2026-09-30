@@ -1,8 +1,6 @@
-import { useState } from "react";
-import { Clock, Link2, Film, Check, Copy } from "lucide-react";
+import { Clock, Film } from "lucide-react";
 import type { CycleProfile, Phase } from "../types";
 import { currentCycleDay, formatDateInZone, formatTimeInZone, phaseForDay } from "../lib/cycleUtils";
-import { buildShareUrl } from "../lib/shareState";
 
 const LOW_ENERGY_DATES = [
   "Teleparty / low-talking movie night",
@@ -32,22 +30,9 @@ export function LDRModule({
   profile: CycleProfile;
   selfTimezone: string;
 }) {
-  const [copied, setCopied] = useState(false);
-
   const day = currentCycleDay(profile);
   const phase = phaseForDay(day, profile.cycleLength);
   const ideas = isLowEnergyPhase(phase.key) ? LOW_ENERGY_DATES : HIGH_ENERGY_DATES;
-
-  async function copyShareLink() {
-    const url = buildShareUrl(profile);
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      window.prompt("Copy this share link:", url);
-    }
-  }
 
   return (
     <section className="bg-white border border-zinc-200 rounded-xl shadow-card p-6 sm:p-8">
@@ -117,25 +102,9 @@ export function LDRModule({
         </div>
       </div>
 
-      {/* Share sync link */}
-      <div className="mt-6 border-t border-zinc-100 pt-5">
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide flex items-center gap-1.5">
-          <Link2 className="w-3.5 h-3.5" strokeWidth={1.75} />
-          Share this cycle
-        </p>
-        <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-          Generates a read-only link with cycle dates and timezone only — no notes, tasks, or chat
-          history included.
-        </p>
-        <button
-          type="button"
-          onClick={copyShareLink}
-          className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-medium bg-slate text-white px-3.5 py-2 rounded-lg hover:bg-zinc-800 transition-colors"
-        >
-          {copied ? <Check className="w-3.5 h-3.5" strokeWidth={2} /> : <Copy className="w-3.5 h-3.5" strokeWidth={1.75} />}
-          {copied ? "Link copied" : "Copy share link"}
-        </button>
-      </div>
+      <p className="mt-6 border-t border-zinc-100 pt-4 text-xs leading-relaxed text-zinc-500">
+        This cycle is shared read-only from the other PhaseTwo account. Only the invited account can view it; their symptom history and notes remain private.
+      </p>
     </section>
   );
 }

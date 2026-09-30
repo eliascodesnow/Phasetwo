@@ -35,12 +35,11 @@ describe("symptom labels", () => {
 });
 
 describe("ai provider settings", () => {
-  it("stores the OpenRouter API key field instead of the deprecated Gemini field", () => {
+  it("keeps provider credentials out of browser settings", () => {
     expect(defaultSettings).toMatchObject({
-      openRouterApiKey: "",
       ldrEnabled: false,
     });
-    expect("geminiApiKey" in defaultSettings).toBe(false);
+    expect("openRouterApiKey" in defaultSettings).toBe(false);
   });
 });
 

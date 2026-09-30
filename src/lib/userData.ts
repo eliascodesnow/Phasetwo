@@ -22,9 +22,8 @@ export async function loadSyncedAppState(userId: string): Promise<UserAppState> 
     cycleProfile: { ...defaultCycleProfile, ...(data.cycle_profile ?? {}) },
     tasks: data.tasks ?? [],
     appSettings: {
-      ...defaultSettings,
-      ...(data.app_settings ?? {}),
-      openRouterApiKey: localState.appSettings.openRouterApiKey,
+      role: data.app_settings?.role === "partner" ? "partner" : defaultSettings.role,
+      ldrEnabled: Boolean(data.app_settings?.ldrEnabled),
     },
     chatMessages: data.chat_messages ?? [],
   };
@@ -41,7 +40,7 @@ export async function saveSyncedAppState(userId: string, state: UserAppState): P
     user_id: userId,
     cycle_profile: state.cycleProfile,
     tasks: state.tasks,
-    app_settings: { ...state.appSettings, openRouterApiKey: "" },
+    app_settings: state.appSettings,
     chat_messages: state.chatMessages,
     updated_at: new Date().toISOString(),
   });

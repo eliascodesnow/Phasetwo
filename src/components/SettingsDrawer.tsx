@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { X, ShieldCheck } from "lucide-react";
+import { X } from "lucide-react";
 import type { AppSettings, CycleProfile, UserRole } from "../types";
 import { MEDICAL_DISCLAIMER } from "../lib/endoContent";
 
@@ -12,7 +11,6 @@ export function SettingsDrawer({
   onSettingsChange,
   profile,
   onProfileChange,
-  hasEnvKey,
 }: {
   open: boolean;
   onClose: () => void;
@@ -20,10 +18,7 @@ export function SettingsDrawer({
   onSettingsChange: (s: AppSettings) => void;
   profile: CycleProfile;
   onProfileChange: (p: CycleProfile) => void;
-  hasEnvKey: boolean;
 }) {
-  const [localKey, setLocalKey] = useState(settings.openRouterApiKey);
-
   if (!open) return null;
 
   function setRole(role: UserRole) {
@@ -147,36 +142,6 @@ export function SettingsDrawer({
             </div>
           </div>
 
-          {/* API key */}
-          <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">OpenRouter API key</p>
-            {hasEnvKey ? (
-              <div className="flex items-center gap-2 text-xs text-sage-dark bg-sage-light border border-sage/20 rounded-lg px-3 py-2.5">
-                <ShieldCheck className="w-4 h-4 flex-shrink-0" strokeWidth={1.75} />
-                Using the key from your local .env.local file. You can override it below.
-              </div>
-            ) : (
-              <p className="text-xs text-zinc-400 mb-2">
-                Stored only in this browser's local storage and sent to the OpenRouter-backed assistant when you chat.
-              </p>
-            )}
-            <input
-              type="password"
-              value={localKey}
-              onChange={(e) => setLocalKey(e.target.value)}
-              onBlur={() => onSettingsChange({ ...settings, openRouterApiKey: localKey })}
-              placeholder="Paste your OpenRouter API key"
-              className="mt-2 w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:border-sage"
-            />
-            <a
-              href="https://openrouter.ai/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-1.5 inline-block text-xs text-sage hover:underline"
-            >
-              Get a key from OpenRouter ↗
-            </a>
-          </div>
         </div>
       </div>
     </div>

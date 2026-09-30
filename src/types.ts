@@ -48,6 +48,5 @@ export interface PhaseInfo {
 
 export interface AppSettings {
   role: UserRole;
-  openRouterApiKey: string; // stored locally only
   ldrEnabled: boolean;
 }
