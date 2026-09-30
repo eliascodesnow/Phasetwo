@@ -27,7 +27,8 @@ export type Symptom =
   | "other";
 
 export type Bleeding = "none" | "light" | "medium" | "heavy";
-export type Impact = "none" | "some" | "missed_activity";
+export type Impact = "none" | "mild" | "moderate" | "significant" | "unable" | "some" | "missed_activity";
+export type ImpactArea = "school" | "work" | "exercise" | "sleep" | "social" | "responsibilities";
 
 export interface SymptomLog {
   id?: string;
@@ -40,6 +41,8 @@ export interface SymptomLog {
   symptoms: Symptom[];
   bleeding: Bleeding | null;
   impact: Impact;
+  impact_areas?: ImpactArea[];
+  outside_period?: boolean | null;
   painkillers_helped?: boolean | null;
   notes?: string | null;
   created_at?: string;
@@ -106,12 +109,90 @@ export const BLEEDING_LABELS: Record<Bleeding, string> = {
   heavy: "Heavy",
 };
 
-export const IMPACT_OPTIONS: Impact[] = ["none", "some", "missed_activity"];
+export const IMPACT_OPTIONS: Impact[] = ["none", "mild", "moderate", "significant", "unable"];
 export const IMPACT_LABELS: Record<Impact, string> = {
-  none: "Not really",
-  some: "A bit",
-  missed_activity: "It got in the way",
+  none: "No impact",
+  mild: "Mild disruption",
+  moderate: "Moderate disruption",
+  significant: "Significant disruption",
+  unable: "Unable to do usual activities",
+  some: "Mild disruption",
+  missed_activity: "Significant disruption",
 };
+
+export interface SymptomPatternSummary {
+  cyclesReviewed: number;
+  recurringCycles: number;
+  patterns: string[];
+  recommendEvaluation: boolean;
+}
+
+const BOWEL_OR_URINARY_SYMPTOMS = new Set(["bowel_pain", "urination_pain"]);
+const GASTROINTESTINAL_SYMPTOMS = new Set(["bloating", "nausea", ...BOWEL_OR_URINARY_SYMPTOMS]);
+
+function isMeaningfulImpact(impact: Impact): boolean {
+  return ["moderate", "significant", "unable", "missed_activity"].includes(impact);
+}
+
+export function analyzeSymptomPatterns(
+  logs: SymptomLog[],
+  profile: CycleProfile
+): SymptomPatternSummary {
+  const cycleLength = Math.max(1, profile.cycleLength || 28);
+  const anchor = new Date(`${profile.lastPeriodStart}T12:00:00`).getTime();
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  const groups = new Map<number, SymptomLog[]>();
+
+  for (const log of logs) {
+    const date = new Date(`${log.log_date}T12:00:00`).getTime();
+    if (!Number.isFinite(date) || !Number.isFinite(anchor)) continue;
+    const cycleIndex = Math.floor((date - anchor) / (millisecondsPerDay * cycleLength));
+    groups.set(cycleIndex, [...(groups.get(cycleIndex) ?? []), log]);
+  }
+
+  const cycles = [...groups.entries()]
+    .sort(([left], [right]) => right - left)
+    .slice(0, 3)
+    .map(([, entries]) => entries);
+
+  if (cycles.length < 3) {
+    return { cyclesReviewed: cycles.length, recurringCycles: 0, patterns: [], recommendEvaluation: false };
+  }
+
+  const repeated = (matches: (entry: SymptomLog) => boolean) =>
+    cycles.filter((entries) => entries.some(matches)).length;
+  const patterns: string[] = [];
+  const recurringIndicators = [
+    { label: "high pain", test: (entry: SymptomLog) => entry.pain_score >= 7 },
+    { label: "daily activities affected", test: (entry: SymptomLog) => isMeaningfulImpact(entry.impact) },
+    { label: "heavy bleeding", test: (entry: SymptomLog) => entry.bleeding === "heavy" },
+    {
+      label: "symptoms outside bleeding days",
+      test: (entry: SymptomLog) => entry.outside_period === true && (entry.pain_score >= 4 || entry.symptoms.length > 0),
+    },
+    {
+      label: "digestive, bowel, or urinary symptoms",
+      test: (entry: SymptomLog) => entry.symptoms.some((symptom) => GASTROINTESTINAL_SYMPTOMS.has(symptom)),
+    },
+  ];
+
+  for (const indicator of recurringIndicators) {
+    if (repeated(indicator.test) >= 2) patterns.push(indicator.label);
+  }
+
+  const recurringCycles = cycles.filter((entries) =>
+    recurringIndicators.some((indicator) => entries.some(indicator.test))
+  ).length;
+
+  if (patterns.length >= 2) patterns.push("more than one recurring symptom pattern");
+
+  return {
+    cyclesReviewed: cycles.length,
+    recurringCycles,
+    patterns,
+    recommendEvaluation: patterns.length > 0,
+  };
+}
 
 export function formatDateKey(date: string | Date): string {
   const input = typeof date === "string" ? date : new Date(date);
