@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Download, LoaderCircle, MessageCircle, RotateCcw, Send, Trash2, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { MEDICAL_DISCLAIMER } from "../lib/endoContent";
+import { BELLA_OFFLINE_REFERENCES, findBellaOfflineReference } from "../lib/bellaOffline";
 
 type BellaSource = { title: string; organization: string; url: string };
 type BellaMessage = {
@@ -10,6 +11,7 @@ type BellaMessage = {
   text: string;
   sources?: BellaSource[];
   appointmentSummary?: boolean;
+  offlineReference?: boolean;
 };
 
 const SUGGESTED_PROMPTS = [
@@ -50,18 +52,23 @@ export function AskBellaLauncher() {
       setError("Please keep your message under 1,600 characters.");
       return;
     }
-    if (!supabase) {
-      setError("Bella is unavailable because secure sign-in is not configured.");
-      return;
-    }
-
     const userMessage: BellaMessage = { id: crypto.randomUUID(), role: "user", text: message };
     const precedingMessages = messages.slice(-8);
     setMessages((current) => [...current, userMessage]);
     setDraft("");
     setError("");
     setFailedMessage("");
+
+    if (!supabase) {
+      setError("Bella is unavailable because secure sign-in is not configured.");
+      setFailedMessage(message);
+      const reference = findBellaOfflineReference(message);
+      if (reference) addOfflineResponse(reference);
+      return;
+    }
+
     setPending(true);
+    let allowOfflineFallback = true;
 
     try {
       const { data, error: invokeError } = await supabase.functions.invoke<{
@@ -70,12 +77,13 @@ export function AskBellaLauncher() {
       }>("bella-chat", {
         body: {
           message,
-          history: precedingMessages.map(({ role, text: content }) => ({ role, content })),
+          history: precedingMessages.map(({ role, text: content }) => ({ role, content: content.slice(0, 1_200) })),
           conversationId: "session",
         },
       });
       if (invokeError) {
         const status = "status" in invokeError ? Number(invokeError.status) : undefined;
+        allowOfflineFallback = status !== 401 && status !== 429;
         throw Object.assign(new Error(friendlyError(status)), { safeMessage: friendlyError(status) });
       }
       if (!data?.text?.trim()) throw new Error("BELLA_EMPTY_RESPONSE");
@@ -93,9 +101,31 @@ export function AskBellaLauncher() {
         : friendlyError();
       setError(safeMessage);
       setFailedMessage(message);
+      if (allowOfflineFallback) {
+        const reference = findBellaOfflineReference(message);
+        if (reference) addOfflineResponse(reference);
+      }
     } finally {
       setPending(false);
     }
+  }
+
+  function addOfflineResponse(reference: (typeof BELLA_OFFLINE_REFERENCES)[number]) {
+    setMessages((current) => [...current, {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      text: reference.text,
+      sources: [reference.source],
+      offlineReference: true,
+    }]);
+  }
+
+  function showOfflineReference(referenceId: string) {
+    const reference = BELLA_OFFLINE_REFERENCES.find((item) => item.id === referenceId);
+    if (!reference) return;
+    addOfflineResponse(reference);
+    setError("");
+    setFailedMessage("");
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -121,8 +151,7 @@ export function AskBellaLauncher() {
       {open && (
         <section role="dialog" aria-modal="true" aria-labelledby="ask-bella-title" className="fixed bottom-20 right-3 z-50 flex h-[min(720px,calc(100dvh-6.5rem))] w-[min(440px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-[#fcfbf9] shadow-2xl sm:bottom-24 sm:right-6">
           <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3.5">
-            <div className="flex min-w-0 items-center gap-3">
-              <img src="/phasetwo-mark.svg" alt="" className="h-10 w-10 shrink-0" />
+            <div className="min-w-0">
               <div className="min-w-0">
                 <h2 id="ask-bella-title" className="font-display text-base font-semibold text-zinc-900">Ask Bella</h2>
                 <p className="text-xs text-zinc-500">Your menstrual health companion</p>
@@ -146,6 +175,7 @@ export function AskBellaLauncher() {
             {messages.map((message) => (
               <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[90%] rounded-lg px-3.5 py-2.5 text-sm leading-relaxed ${message.role === "user" ? "bg-slate text-white" : "border border-zinc-200 bg-white text-zinc-800"}`}>
+                  {message.offlineReference && <p className="mb-1 text-[10px] font-semibold uppercase text-zinc-500">Offline reference</p>}
                   <p className="whitespace-pre-wrap">{message.text}</p>
                   {message.appointmentSummary && message.role === "assistant" && <button type="button" onClick={() => downloadSummary(message)} className="mt-3 inline-flex min-h-9 items-center gap-2 border-t border-zinc-100 pt-2 text-xs font-medium text-sage-dark hover:text-sage"><Download className="h-3.5 w-3.5" />Download reviewed summary</button>}
                   {!!message.sources?.length && <div className="mt-3 border-t border-zinc-100 pt-2"><p className="text-[11px] font-semibold text-zinc-500">Sources</p><ul className="mt-1 space-y-1">{message.sources.map((source) => <li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer" className="text-xs text-sage-dark underline decoration-sage/40 underline-offset-2 hover:text-sage">{source.organization}: {source.title}</a></li>)}</ul></div>}
@@ -153,7 +183,7 @@ export function AskBellaLauncher() {
               </div>
             ))}
             {pending && <div className="flex items-center gap-2 text-sm text-zinc-500"><LoaderCircle className="h-4 w-4 animate-spin text-sage" />Bella is thinking…</div>}
-            {error && <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}{failedMessage && <button type="button" onClick={() => void sendMessage(failedMessage)} disabled={pending} className="ml-2 inline-flex items-center gap-1 font-medium underline underline-offset-2 disabled:opacity-50"><RotateCcw className="h-3 w-3" />Retry</button>}</div>}
+            {error && <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}{failedMessage && <button type="button" onClick={() => void sendMessage(failedMessage)} disabled={pending} className="ml-2 inline-flex items-center gap-1 font-medium underline underline-offset-2 disabled:opacity-50"><RotateCcw className="h-3 w-3" />Retry</button>}<p className="mt-2 border-t border-rose-200 pt-2 text-xs font-medium">Offline reference topics</p><div className="mt-1 flex flex-wrap gap-1.5">{BELLA_OFFLINE_REFERENCES.map((reference) => <button key={reference.id} type="button" onClick={() => showOfflineReference(reference.id)} className="rounded border border-rose-200 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-rose-50">{reference.title}</button>)}</div></div>}
           </div>
 
           <div className="border-t border-zinc-200 bg-white px-4 py-3">
@@ -165,8 +195,7 @@ export function AskBellaLauncher() {
           </div>
         </section>
       )}
-      <button type="button" aria-expanded={open} aria-label="Ask Bella" onClick={() => setOpen((current) => !current)} className="inline-flex min-h-12 items-center gap-2 rounded-full border border-[#416353]/20 bg-white py-1.5 pl-1.5 pr-4 text-sm font-semibold text-zinc-900 shadow-lg transition-transform hover:-translate-y-0.5 hover:shadow-xl">
-        <img src="/phasetwo-mark.svg" alt="" className="h-9 w-9" />
+      <button type="button" aria-expanded={open} aria-label="Ask Bella" onClick={() => setOpen((current) => !current)} className="inline-flex min-h-12 items-center gap-2 rounded-full border border-[#416353]/20 bg-white px-4 py-1.5 text-sm font-semibold text-zinc-900 shadow-lg transition-transform hover:-translate-y-0.5 hover:shadow-xl">
         Ask Bella
         <MessageCircle className="h-4 w-4 text-sage" />
       </button>

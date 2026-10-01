@@ -78,4 +78,4 @@ export const ENDOMETRIOSIS_RESOURCES: EndometriosisResource[] = [
 ];
 
 export const MEDICAL_DISCLAIMER =
-  "PhaseTwo is an educational and menstrual-tracking tool. It does not diagnose, treat, or rule out endometriosis or any other medical condition. Symptom patterns shown by the app are not a medical diagnosis. If you have persistent, severe, worsening, or concerning symptoms, consult a qualified healthcare professional for appropriate evaluation and advice.";
+  "Education only; not diagnosis or treatment. Seek medical advice for persistent, severe, or worsening symptoms.";
