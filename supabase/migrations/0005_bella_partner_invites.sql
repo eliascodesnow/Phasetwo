@@ -1,29 +1,36 @@
 CREATE TABLE IF NOT EXISTS public.cycle_invitations (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
-  invited_email text NOT NULL CHECK (char_length(invited_email) BETWEEN 3 AND 254),
-  invite_token uuid NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-  accepted_user_id uuid REFERENCES auth.users (id) ON DELETE CASCADE,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  expires_at timestamptz NOT NULL DEFAULT (now() + interval '14 days'),
-  accepted_at timestamptz,
-  CHECK (accepted_user_id IS NULL OR accepted_user_id <> owner_user_id)
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
+    owner_user_id UUID NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+    invited_email text NOT NULL CHECK (
+        char_length(invited_email) BETWEEN 3 AND 254
+    ),
+    invite_token UUID NOT NULL UNIQUE DEFAULT gen_random_uuid (),
+    accepted_user_id UUID REFERENCES auth.users (id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    expires_at timestamptz NOT NULL DEFAULT(now() + INTERVAL '14 days'),
+    accepted_at timestamptz,
+    CHECK (
+        accepted_user_id IS NULL
+        OR accepted_user_id <> owner_user_id
+    )
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS cycle_invitations_pending_owner_key
-  ON public.cycle_invitations (owner_user_id)
-  WHERE accepted_user_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS cycle_invitations_pending_owner_key ON public.cycle_invitations (owner_user_id)
+WHERE
+    accepted_user_id IS NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS cycle_invitations_partner_key
-  ON public.cycle_invitations (accepted_user_id)
-  WHERE accepted_user_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS cycle_invitations_partner_key ON public.cycle_invitations (accepted_user_id)
+WHERE
+    accepted_user_id IS NOT NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS cycle_invitations_owner_key
-  ON public.cycle_invitations (owner_user_id)
-  WHERE accepted_user_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS cycle_invitations_owner_key ON public.cycle_invitations (owner_user_id)
+WHERE
+    accepted_user_id IS NOT NULL;
 
 ALTER TABLE public.cycle_invitations ENABLE ROW LEVEL SECURITY;
+
 REVOKE ALL ON public.cycle_invitations FROM anon, authenticated;
+
 GRANT ALL ON public.cycle_invitations TO service_role;
 
 CREATE OR REPLACE FUNCTION public.consume_bella_daily_limit(p_limit integer)
@@ -49,8 +56,11 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.consume_bella_daily_limit(integer) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.consume_bella_daily_limit(integer) TO authenticated;
+REVOKE ALL ON FUNCTION public.consume_bella_daily_limit (integer)
+FROM public, anon;
+
+GRANT
+EXECUTE ON FUNCTION public.consume_bella_daily_limit (integer) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.get_my_shared_cycle_profile()
 RETURNS jsonb
@@ -91,8 +101,11 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.get_my_shared_cycle_profile() FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.get_my_shared_cycle_profile() TO authenticated;
+REVOKE ALL ON FUNCTION public.get_my_shared_cycle_profile ()
+FROM public, anon;
+
+GRANT
+EXECUTE ON FUNCTION public.get_my_shared_cycle_profile () TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.leave_cycle_share()
 RETURNS void
@@ -111,5 +124,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.leave_cycle_share() FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.leave_cycle_share() TO authenticated;
+REVOKE ALL ON FUNCTION public.leave_cycle_share () FROM public, anon;
+
+GRANT
+EXECUTE ON FUNCTION public.leave_cycle_share () TO authenticated;
