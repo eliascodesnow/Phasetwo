@@ -45,6 +45,7 @@ function WorkspaceApp({ userId }: { userId: string }) {
   const [appReady, setAppReady] = useState(false);
   const [syncError, setSyncError] = useState("");
   const deletingAccount = useRef(false);
+  const inviteProcessing = useRef(false);
 
   useEffect(() => {
     let ignore = false;
@@ -78,17 +79,24 @@ function WorkspaceApp({ userId }: { userId: string }) {
 
   useEffect(() => {
     if (!appReady || deletingAccount.current || !supabase) return;
-    const token = new URLSearchParams(window.location.search).get("cycleInvite");
-    if (!token) return;
-    const cleanUrl = new URL(window.location.href);
-    cleanUrl.searchParams.delete("cycleInvite");
-    window.history.replaceState({}, "", cleanUrl);
-    if (!window.confirm("Accept this private cycle invitation for your PhaseTwo account?")) return;
+    const client = supabase;
+    let token: string | null = null;
+    try {
+      token = window.sessionStorage.getItem("phasetwo:cycle-invite");
+    } catch {
+      token = new URLSearchParams(window.location.search).get("cycleInvite");
+    }
+    if (!token || inviteProcessing.current) return;
+    inviteProcessing.current = true;
+    if (!window.confirm("Accept this private cycle invitation for your PhaseTwo account?")) {
+      try { window.sessionStorage.removeItem("phasetwo:cycle-invite"); } catch { /* No tab storage available. */ }
+      return;
+    }
 
-    void supabase.functions.invoke("partner-invites", { body: { action: "accept", token } })
+    void client.functions.invoke("partner-invites", { body: { action: "accept", token } })
       .then(async ({ error }) => {
         if (error) throw error;
-        const { data, error: cycleError } = await supabase.rpc("get_my_shared_cycle_profile");
+        const { data, error: cycleError } = await client.rpc("get_my_shared_cycle_profile");
         if (cycleError || !data) throw cycleError ?? new Error("Cycle sync is unavailable.");
         const remote = data as Partial<CycleProfile>;
         if (typeof remote.lastPeriodStart !== "string" || typeof remote.cycleLength !== "number") {
@@ -97,6 +105,7 @@ function WorkspaceApp({ userId }: { userId: string }) {
         setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "" });
         setSettings((current) => ({ ...current, role: "partner", ldrEnabled: true }));
         setSyncError("");
+        try { window.sessionStorage.removeItem("phasetwo:cycle-invite"); } catch { /* No tab storage available. */ }
       })
       .catch(() => setSyncError("We couldn’t accept that invitation. Sign in with the invited email and try again."));
   }, [appReady]);

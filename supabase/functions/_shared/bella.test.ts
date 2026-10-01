@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeBellaObservations, getBellaSafetyResponse, isBellaPersonalDataRequest } from "./bella";
+import { analyzeBellaObservations, enforceBellaResponseSafety, getBellaSafetyResponse, isBellaPersonalDataRequest } from "./bella";
 import type { BellaCycleProfile, BellaSymptomLog } from "./bella";
 
 const profile: BellaCycleProfile = {
@@ -56,6 +56,7 @@ describe("Bella request classification and safety", () => {
   it("does not fetch personal data for general education questions", () => {
     expect(isBellaPersonalDataRequest("What is endometriosis?")).toBe(false);
     expect(isBellaPersonalDataRequest("Why have my last few periods been painful?")).toBe(true);
+    expect(isBellaPersonalDataRequest("What symptoms should I discuss with a doctor?")).toBe(true);
   });
 
   it("declines diagnosis, medication and prompt injection requests without an AI call", () => {
@@ -66,5 +67,13 @@ describe("Bella request classification and safety", () => {
 
   it("directs potentially urgent symptom reports to urgent care", () => {
     expect(getBellaSafetyResponse("I am fainting and bleeding heavily")).toContain("urgent medical attention");
+  });
+
+  it("replaces model responses that make a diagnosis or give medication directions", () => {
+    expect(enforceBellaResponseSafety("You probably have endometriosis.")).toContain("can't determine whether");
+    expect(enforceBellaResponseSafety("Your symptoms suggest you have endometriosis.")).toContain("can't determine whether");
+    expect(enforceBellaResponseSafety("Start your prescribed medication today.")).toContain("can't recommend medication");
+    expect(enforceBellaResponseSafety("Take 400 mg of ibuprofen every six hours.")).toContain("can't recommend medication");
+    expect(enforceBellaResponseSafety("You recorded pain on four dates.")).toBe("You recorded pain on four dates.");
   });
 });

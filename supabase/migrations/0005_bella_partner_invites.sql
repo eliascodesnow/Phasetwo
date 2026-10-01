@@ -10,12 +10,16 @@ CREATE TABLE IF NOT EXISTS public.cycle_invitations (
   CHECK (accepted_user_id IS NULL OR accepted_user_id <> owner_user_id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS cycle_invitations_pending_email_key
-  ON public.cycle_invitations (owner_user_id, lower(invited_email))
+CREATE UNIQUE INDEX IF NOT EXISTS cycle_invitations_pending_owner_key
+  ON public.cycle_invitations (owner_user_id)
   WHERE accepted_user_id IS NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS cycle_invitations_partner_key
   ON public.cycle_invitations (accepted_user_id)
+  WHERE accepted_user_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS cycle_invitations_owner_key
+  ON public.cycle_invitations (owner_user_id)
   WHERE accepted_user_id IS NOT NULL;
 
 ALTER TABLE public.cycle_invitations ENABLE ROW LEVEL SECURITY;

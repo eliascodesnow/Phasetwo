@@ -65,10 +65,12 @@ export function SettingsView({
                 </label>
               </div>
             </fieldset>
-            {settings.role === "self" && <label className="block text-xs font-medium text-zinc-600">Name to display<input value={profile.ownerLabel} onChange={(event) => onProfileChange({ ...profile, ownerLabel: event.target.value })} maxLength={80} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>}
-            <label className="block text-xs font-medium text-zinc-600">Most recent period start<input type="date" value={profile.lastPeriodStart} onChange={(event) => onProfileChange({ ...profile, lastPeriodStart: event.target.value })} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
-            <label className="block text-xs font-medium text-zinc-600">Cycle length (days)<input type="number" min={20} max={45} value={profile.cycleLength} onChange={(event) => onProfileChange({ ...profile, cycleLength: Math.max(20, Math.min(45, Number(event.target.value) || 28)) })} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
-            <label className="block text-xs font-medium text-zinc-600">Period duration (days)<input type="number" min={1} max={10} value={profile.periodLength} onChange={(event) => onProfileChange({ ...profile, periodLength: Math.max(1, Math.min(10, Number(event.target.value) || 5)) })} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
+            {settings.role === "self" && <>
+              <label className="block text-xs font-medium text-zinc-600">Name to display<input value={profile.ownerLabel} onChange={(event) => onProfileChange({ ...profile, ownerLabel: event.target.value })} maxLength={80} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
+              <label className="block text-xs font-medium text-zinc-600">Most recent period start<input type="date" value={profile.lastPeriodStart} onChange={(event) => onProfileChange({ ...profile, lastPeriodStart: event.target.value })} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
+              <label className="block text-xs font-medium text-zinc-600">Cycle length (days)<input type="number" min={20} max={45} value={profile.cycleLength} onChange={(event) => onProfileChange({ ...profile, cycleLength: Math.max(20, Math.min(45, Number(event.target.value) || 28)) })} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
+              <label className="block text-xs font-medium text-zinc-600">Period duration (days)<input type="number" min={1} max={10} value={profile.periodLength} onChange={(event) => onProfileChange({ ...profile, periodLength: Math.max(1, Math.min(10, Number(event.target.value) || 5)) })} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
+            </>}
           </div>
         </section>
 

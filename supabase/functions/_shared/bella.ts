@@ -129,7 +129,7 @@ export function analyzeBellaObservations(
 }
 
 export function isBellaPersonalDataRequest(message: string): boolean {
-  return /\b(my|mine|me|i recorded|i tracked|my tracking|my history|recent cycles?|last (?:few|several|\d+) cycles?|how often|what have you noticed|what symptoms keep|my symptoms|for (?:my )?(?:doctor|appointment)|prepare (?:a |my )?(?:summary|appointment)|summari[sz]e (?:my|the) symptoms)\b/i.test(message);
+  return /\b(my|mine|me|i recorded|i tracked|my tracking|my history|recent cycles?|last (?:few|several|\d+) (?:cycles?|periods?)|how often|what have you noticed|what symptoms keep|my symptoms|symptoms (?:should|can) i discuss|discuss with (?:my )?(?:doctor|healthcare professional)|for (?:my )?(?:doctor|appointment)|prepare (?:a |my )?(?:summary|appointment)|summari[sz]e (?:my|the) symptoms|periods? been (?:more )?painful)\b/i.test(message);
 }
 
 export function isBellaAppointmentRequest(message: string): boolean {
@@ -140,18 +140,30 @@ export function needsBellaSources(message: string): boolean {
   return /\b(endometriosis|menstrual health|period pain|heavy bleeding|pelvic pain|symptom|diagnos|treatment)\b/i.test(message);
 }
 
-export function getBellaSafetyResponse(message: string): string | null {
-  if (/\b(do i have|could i have|diagnose me|tell me i have|confirm that i have|what disease do i have)\b/i.test(message)) {
-    return "I can't tell whether you have endometriosis or any other condition, and PhaseTwo cannot diagnose or rule one out. Several conditions can cause similar symptoms. A qualified healthcare professional can review your history and discuss appropriate evaluation.";
+export function enforceBellaResponseSafety(response: string): string {
+  const diagnosisClaim = /\b(?:you (?:have|definitely have|probably have|likely have)|you are suffering from|this proves you have|phase ?two (?:has )?detected|your symptoms (?:prove|confirm|show|indicate) you have|(?:your symptoms|your history|your tracking data) (?:suggest|indicate|show|prove|confirm) (?:that )?you have)\s*(?:endometriosis|(?:a|an)\s+[a-z-]+(?: disease| condition)?)\b/i;
+  const medicationDirection = /\b(?:start|stop|increase|decrease|change|replace|double|take)\s+(?:taking\s+)?(?:your\s+)?(?:prescribed\s+)?(?:medication|medicine|dose|dosage|ibuprofen|naproxen|aspirin|hormone therapy|birth control)\b|\b(?:take|use)\s+\d+(?:\.\d+)?\s*(?:mg|mcg|ml|tablets?|pills?)\s+of\s+(?:ibuprofen|naproxen|aspirin|acetaminophen|paracetamol|hormone|medicine|medication)\b/i;
+  if (diagnosisClaim.test(response)) {
+    return "I can't determine whether you have endometriosis or another condition, and PhaseTwo cannot diagnose or rule one out. Several conditions can cause similar symptoms. A qualified healthcare professional can review your history and discuss appropriate evaluation.";
   }
-  if (/\b(which|what|how much|how many|should i|can i)\b.{0,45}\b(medication|medicine|dose|dosage|painkiller|ibuprofen|naproxen|hormone treatment|prescription)\b/i.test(message)) {
-    return "I can't recommend a medication, dose, or change to prescribed treatment. A qualified healthcare professional or pharmacist can advise based on your health history and other medicines. If symptoms are severe or worsening, seek medical advice promptly.";
+  if (medicationDirection.test(response)) {
+    return "I can't recommend medication or changes to prescribed treatment. A qualified healthcare professional or pharmacist can give advice based on your health history and other medicines.";
+  }
+  return response;
+}
+
+export function getBellaSafetyResponse(message: string): string | null {
+  if (/\b(fainting|passed out|difficulty breathing|uncontrolled bleeding|sudden severe pain|severe pain and pregnant)\b/i.test(message)) {
+    return "Those symptoms may need urgent medical attention. Please contact local emergency services or seek urgent medical care now, especially if symptoms are severe, sudden, or getting worse. I can't determine the cause here.";
   }
   if (/\b(ignore all previous|ignore your instructions|reveal your system prompt|you are now|pretend you are a doctor)\b/i.test(message)) {
     return "I can help with menstrual-health education and your recorded PhaseTwo patterns, but I can't diagnose or replace a healthcare professional.";
   }
-  if (/\b(fainting|passed out|difficulty breathing|uncontrolled bleeding|sudden severe pain|severe pain and pregnant)\b/i.test(message)) {
-    return "Those symptoms may need urgent medical attention. Please contact local emergency services or seek urgent medical care now, especially if symptoms are severe, sudden, or getting worse. I can't determine the cause here.";
+  if (/\b(do i have|could i have|diagnose me|tell me (?:that )?i have|confirm that i have|what disease do i have)\b/i.test(message)) {
+    return "I can't tell whether you have endometriosis or any other condition, and PhaseTwo cannot diagnose or rule one out. Several conditions can cause similar symptoms. A qualified healthcare professional can review your history and discuss appropriate evaluation.";
+  }
+  if (/\b(which|what|how much|how many|should i|can i)\b.{0,45}\b(medication|medicine|dose|dosage|painkiller|ibuprofen|naproxen|hormone treatment|prescription)\b/i.test(message)) {
+    return "I can't recommend a medication, dose, or change to prescribed treatment. A qualified healthcare professional or pharmacist can advise based on your health history and other medicines. If symptoms are severe or worsening, seek medical advice promptly.";
   }
   return null;
 }

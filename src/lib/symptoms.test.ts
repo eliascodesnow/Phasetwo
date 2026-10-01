@@ -3,7 +3,7 @@ vi.mock("./supabase", () => ({ hasSupabaseConfig: false, supabase: null }));
 
 import { defaultSettings } from "./storage";
 import type { SymptomLog } from "./symptoms";
-import { analyzeSymptomPatterns, PAIN_LOCATION_LABELS, SYMPTOM_LABELS, buildSymptomLogMeta, fetchLogs, hasUserConsented, saveUserConsent, upsertLog, type SymptomLog } from "./symptoms";
+import { analyzeSymptomPatterns, PAIN_LOCATION_LABELS, SYMPTOM_LABELS, buildSymptomLogMeta, fetchLogs, hasUserConsented, saveUserConsent, upsertLog } from "./symptoms";
 
 beforeEach(() => {
   const store = new Map<string, string>();

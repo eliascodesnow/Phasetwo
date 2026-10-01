@@ -37,6 +37,19 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   useEffect(() => {
+    const inviteToken = new URLSearchParams(window.location.search).get("cycleInvite");
+    if (!inviteToken || !/^[0-9a-f-]{36}$/i.test(inviteToken)) return;
+    try {
+      window.sessionStorage.setItem("phasetwo:cycle-invite", inviteToken);
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("cycleInvite");
+      window.history.replaceState({}, "", cleanUrl);
+    } catch {
+      // Keep the invitation URL available if browser storage is restricted.
+    }
+  }, []);
+
+  useEffect(() => {
     const container = captchaContainerRef.current;
     if (!container || !turnstileSiteKey) return;
 
@@ -105,7 +118,7 @@ export function AuthGate({ children }: { children: (user: User) => ReactNode }) 
         });
         if (error) throw error;
         if (!data.session) {
-          setNotice("Check your email to confirm your account, then return here to finish your profile.");
+          setNotice("Check your email to confirm your account, then return here to sign in.");
         }
       }
       window.turnstile?.reset(turnstileWidgetId.current);

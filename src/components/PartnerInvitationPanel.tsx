@@ -91,8 +91,8 @@ export function PartnerInvitationPanel() {
         </div>
       ) : invitation?.token ? (
         <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-          <p className="text-sm font-medium text-zinc-800">Invite sent to {invitation.email}</p>
-          <p className="mt-1 text-xs text-zinc-500">Expires {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(invitation.expiresAt))}. The recipient must sign in using this exact email.</p>
+          <p className="text-sm font-medium text-zinc-800">{invitation.accepted ? `Synced with ${invitation.email}` : `Invite sent to ${invitation.email}`}</p>
+          <p className="mt-1 text-xs text-zinc-500">{invitation.accepted ? "Their account can view your cycle dates and length only." : `Expires ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(invitation.expiresAt))}. The recipient must sign in using this exact email.`}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={() => void copyInvite()} className="inline-flex min-h-9 items-center gap-2 rounded-md bg-slate px-3 text-xs font-medium text-white hover:bg-zinc-800">{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "Copied" : "Copy invite link"}</button>
             <button type="button" onClick={() => void revokeInvite()} disabled={busy} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-zinc-300 px-3 text-xs text-zinc-600 hover:bg-white disabled:opacity-50"><X className="h-3.5 w-3.5" />Revoke</button>

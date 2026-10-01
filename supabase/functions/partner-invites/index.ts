@@ -58,6 +58,14 @@ Deno.serve(async (request: Request) => {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || email === user.email?.toLowerCase()) {
         return json(request, 400, { error: "INVALID_INVITATION" });
       }
+      const { data: activeLink } = await serviceClient
+        .from("cycle_invitations")
+        .select("id")
+        .eq("owner_user_id", user.id)
+        .not("accepted_user_id", "is", null)
+        .limit(1)
+        .maybeSingle();
+      if (activeLink) return json(request, 409, { error: "INVITATION_UNAVAILABLE" });
       await serviceClient
         .from("cycle_invitations")
         .delete()
