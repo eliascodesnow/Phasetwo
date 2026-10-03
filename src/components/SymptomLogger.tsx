@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarRange, HeartPulse, Loader2, ShieldCheck } from "lucide-react";
 import { buildEmptySymptomLog, buildSymptomLogMeta, deleteAllSymptomLogs, fetchLogs, hasRemoteSymptomStorage, hasUserConsented, saveUserConsent, upsertLog, type PainLocation, type Symptom, type SymptomLog, IMPACT_AREA_LABELS, IMPACT_AREA_OPTIONS, IMPACT_LABELS, IMPACT_OPTIONS, PAIN_LOCATION_LABELS, PAIN_LOCATION_OPTIONS, SYMPTOM_LABELS, SYMPTOM_OPTIONS, BLEEDING_LABELS, BLEEDING_OPTIONS } from "../lib/symptoms";
 import type { CycleProfile } from "../types";
@@ -43,16 +43,35 @@ function isSelected<T extends string>(values: T[] | undefined, value: T): boolea
   return clampArray(values).includes(value);
 }
 
-export function SymptomLogger({ profile, userId, onHistoryChange }: { profile: CycleProfile; userId: string; onHistoryChange?: (logs: SymptomLog[]) => void }) {
+function normalizeLog(entry: SymptomLog | undefined, profile: CycleProfile, date: string): SymptomLog {
+  const base = entry ?? buildEmptySymptomLog(profile, date);
+  return {
+    ...base,
+    log_date: date,
+    notes: base.notes ?? "",
+    pain_locations: clampArray(base.pain_locations),
+    symptoms: clampArray(base.symptoms),
+    bleeding: base.bleeding ?? "none",
+    impact: base.impact === "some" ? "mild" : base.impact === "missed_activity" ? "significant" : base.impact ?? "none",
+    impact_areas: clampArray(base.impact_areas),
+    outside_period: base.outside_period ?? false,
+  };
+}
+
+export type SymptomLoggerSaveRef = { current: (() => Promise<boolean>) | null };
+
+export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange, saveActionRef }: { profile: CycleProfile; userId: string; initialLogDate?: string; onHistoryChange?: (logs: SymptomLog[]) => void; saveActionRef?: SymptomLoggerSaveRef }) {
   const todayKey = formatDateKey(new Date());
-  const remoteStorageEnabled = useMemo(() => hasRemoteSymptomStorage(), []);
+  const remoteStorageEnabled = useMemo(() => hasRemoteSymptomStorage(userId), [userId]);
   const [log, setLog] = useState<SymptomLog>(() => buildEmptySymptomLog(profile, todayKey));
   const [history, setHistory] = useState<SymptomLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
   const [consentGranted, setConsentGranted] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
+  const saveHandlerRef = useRef<() => Promise<boolean>>(async () => true);
 
   useEffect(() => {
     onHistoryChange?.(history);
@@ -77,17 +96,9 @@ export function SymptomLogger({ profile, userId, onHistoryChange }: { profile: C
         if (ignore) return;
 
         setHistory(entries);
-        const todayEntry = entries.find((entry) => entry.log_date === todayKey) ?? buildEmptySymptomLog(profile, todayKey);
-        setLog({
-          ...todayEntry,
-          notes: todayEntry.notes ?? "",
-          pain_locations: clampArray(todayEntry.pain_locations),
-          symptoms: clampArray(todayEntry.symptoms),
-          bleeding: todayEntry.bleeding ?? "none",
-          impact: todayEntry.impact === "some" ? "mild" : todayEntry.impact === "missed_activity" ? "significant" : todayEntry.impact ?? "none",
-          impact_areas: clampArray(todayEntry.impact_areas),
-          outside_period: todayEntry.outside_period ?? false,
-        });
+        const selectedDate = initialLogDate ?? todayKey;
+        setLog(normalizeLog(entries.find((entry) => entry.log_date === selectedDate), profile, selectedDate));
+        setDirty(false);
         setConsentGranted(!remoteStorageEnabled || hasConsent);
       } catch (loadError) {
         if (!ignore) {
@@ -104,16 +115,24 @@ export function SymptomLogger({ profile, userId, onHistoryChange }: { profile: C
     return () => {
       ignore = true;
     };
-  }, [profile, todayKey, userId]);
+  }, [initialLogDate, profile, todayKey, userId]);
 
   function updateLog<K extends keyof SymptomLog>(key: K, value: SymptomLog[K]) {
+    setDirty(true);
     setLog((current) => ({
       ...current,
       [key]: value,
     }));
   }
 
+  function changeLogDate(date: string) {
+    if (!date) return;
+    setLog(normalizeLog(history.find((entry) => entry.log_date === date), profile, date));
+    setDirty(false);
+  }
+
   function toggleMultiSelect<K extends "pain_locations" | "symptoms">(key: K, value: K extends "pain_locations" ? PainLocation : Symptom) {
+    setDirty(true);
     setLog((current) => {
       const values = clampArray(current[key] as string[] | undefined) as Array<PainLocation | Symptom>;
       const next = values.includes(value as never)
@@ -151,6 +170,7 @@ export function SymptomLogger({ profile, userId, onHistoryChange }: { profile: C
     };
 
     const optimistic = { ...payload, created_at: new Date().toISOString() };
+    const previousEntry = history.find((entry) => entry.log_date === payload.log_date);
 
     setHistory((prev) => {
       const filtered = prev.filter((entry) => entry.log_date !== payload.log_date);
@@ -166,21 +186,36 @@ export function SymptomLogger({ profile, userId, onHistoryChange }: { profile: C
         return [saved, ...filtered].sort((a, b) => b.log_date.localeCompare(a.log_date));
       });
       setLog({ ...saved, notes: saved.notes ?? "", pain_locations: clampArray(saved.pain_locations), symptoms: clampArray(saved.symptoms), bleeding: saved.bleeding ?? "none", impact: saved.impact ?? "none", impact_areas: clampArray(saved.impact_areas), outside_period: saved.outside_period ?? false });
+      setDirty(false);
+      return true;
     } catch (saveError) {
-      setHistory((prev) => prev.filter((entry) => entry.log_date !== payload.log_date));
+      setHistory((prev) => {
+        const filtered = prev.filter((entry) => entry.log_date !== payload.log_date);
+        return previousEntry ? [...filtered, previousEntry].sort((a, b) => b.log_date.localeCompare(a.log_date)) : filtered;
+      });
       setError(saveError instanceof Error ? saveError.message : "Unable to save your symptom check-in.");
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
-  async function handleSave() {
+  async function handleSave(): Promise<boolean> {
+    if (!dirty) return true;
     if (remoteStorageEnabled && !consentGranted) {
       setConsentOpen(true);
-      return;
+      return false;
     }
-    await saveCurrentLog();
+    return saveCurrentLog();
   }
+
+  saveHandlerRef.current = handleSave;
+
+  useEffect(() => {
+    if (!saveActionRef) return;
+    saveActionRef.current = () => saveHandlerRef.current();
+    return () => { saveActionRef.current = null; };
+  }, [saveActionRef]);
 
   async function handleConsentAccept() {
     try {
@@ -201,6 +236,7 @@ export function SymptomLogger({ profile, userId, onHistoryChange }: { profile: C
       await deleteAllSymptomLogs(userId);
       setHistory([]);
       setLog(buildEmptySymptomLog(profile, todayKey));
+      setDirty(false);
       setError("");
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Unable to delete your symptom history.");
@@ -246,7 +282,7 @@ export function SymptomLogger({ profile, userId, onHistoryChange }: { profile: C
           <div className="space-y-5">
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
               <div className="mb-2 flex items-center justify-between gap-2 text-sm font-medium text-zinc-700">
-                <span className="flex items-center gap-2"><CalendarRange className="h-4 w-4 text-sage" strokeWidth={2.1} />Today</span>
+                <label className="flex items-center gap-2"><CalendarRange className="h-4 w-4 text-sage" strokeWidth={2.1} /><span className="sr-only">Log date</span><input type="date" value={log.log_date} max={todayKey} onChange={(event) => changeLogDate(event.target.value)} className="rounded border border-zinc-200 bg-white px-2 py-1 text-sm font-medium text-zinc-700" /></label>
                 <span className="tabular text-zinc-500">Day {log.cycle_day || currentCycleDay(profile, new Date())}</span>
               </div>
 
@@ -314,11 +350,6 @@ export function SymptomLogger({ profile, userId, onHistoryChange }: { profile: C
                 })}
               </div>
             </div>
-
-            <label className="flex min-h-11 items-start gap-2 text-sm text-zinc-700">
-              <input type="checkbox" checked={log.outside_period === true} onChange={(event) => updateLog("outside_period", event.target.checked)} className="mt-0.5 accent-[#4A6B5D]" />
-              Symptoms happened on a day I was not bleeding
-            </label>
 
             <div className="space-y-3">
               <p className="text-sm font-medium text-zinc-700">Bleeding</p>
@@ -418,7 +449,7 @@ export function SymptomLogger({ profile, userId, onHistoryChange }: { profile: C
               <div className="flex flex-wrap justify-end gap-2">
                 <button type="button" onClick={() => void handleDeleteHistory()} disabled={saving || history.length === 0} className="min-h-[44px] rounded-xl border border-zinc-200 px-3 py-2.5 text-xs font-medium text-zinc-600 disabled:opacity-50">Delete symptom history</button>
                 <button type="button" onClick={handleSave} disabled={saving} className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-sage px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-70">
-                  {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : "Save today"}
+                  {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : log.log_date === todayKey ? "Save today" : "Save log"}
                 </button>
               </div>
             </div>

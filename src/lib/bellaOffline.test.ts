@@ -16,6 +16,15 @@ describe("findBellaOfflineReference", () => {
     });
   });
 
+  it("matches more specific education topics over generic cycle terms", () => {
+    expect(findBellaOfflineReference("What is PCOS?")?.id).toBe("pcos");
+    expect(findBellaOfflineReference("Could I have PCOS?")?.id).toBe("diagnosis");
+    expect(findBellaOfflineReference("What is PMDD?")?.id).toBe("pmdd");
+    expect(findBellaOfflineReference("Why are my periods irregular?")?.id).toBe("irregular-periods");
+    expect(findBellaOfflineReference("What are uterine fibroids?")?.id).toBe("fibroids");
+    expect(findBellaOfflineReference("How does the menstrual cycle work?")?.id).toBe("menstrual-cycle");
+  });
+
   it("returns no answer for unsupported topics", () => {
     expect(findBellaOfflineReference("What is the weather tomorrow?")).toBeUndefined();
   });

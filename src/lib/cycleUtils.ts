@@ -67,7 +67,22 @@ export function currentPhase(profile: CycleProfile, asOf: Date = new Date()): Ph
 }
 
 export function recordPeriodStart(profile: CycleProfile, date: string): CycleProfile {
-  const starts = [...new Set([...(profile.periodStartDates ?? []), profile.lastPeriodStart, date])]
+  return withPeriodStarts(profile, [...(profile.periodStartDates ?? []), profile.lastPeriodStart, date]);
+}
+
+export function editPeriodStart(profile: CycleProfile, previousDate: string, nextDate: string): CycleProfile {
+  const starts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
+  return withPeriodStarts(profile, starts.map((date) => date === previousDate ? nextDate : date));
+}
+
+export function removePeriodStart(profile: CycleProfile, date: string): CycleProfile {
+  const starts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
+  const remaining = starts.filter((start) => start !== date);
+  return withPeriodStarts(profile, remaining.length ? remaining : [profile.lastPeriodStart]);
+}
+
+function withPeriodStarts(profile: CycleProfile, values: string[]): CycleProfile {
+  const starts = [...new Set(values)]
     .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
     .sort((left, right) => left.localeCompare(right));
   const intervals = starts.slice(1).map((start, index) => {
@@ -82,7 +97,7 @@ export function recordPeriodStart(profile: CycleProfile, date: string): CyclePro
 
   return {
     ...profile,
-    lastPeriodStart: starts[starts.length - 1] ?? date,
+    lastPeriodStart: starts[starts.length - 1] ?? profile.lastPeriodStart,
     periodStartDates: starts.slice(-24),
     cycleLength,
   };
@@ -97,6 +112,14 @@ function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+function formatDateKey(date: Date): string {
+  const normalized = startOfDay(date);
+  const year = normalized.getFullYear();
+  const month = String(normalized.getMonth() + 1).padStart(2, "0");
+  const day = String(normalized.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function nextPeriodEstimate(profile: CycleProfile, asOf: Date = new Date()): Date {
   const start = startOfDay(new Date(profile.lastPeriodStart));
   const cycleLength = profile.cycleLength || 28;
@@ -105,6 +128,54 @@ export function nextPeriodEstimate(profile: CycleProfile, asOf: Date = new Date(
   const next = new Date(asOf);
   next.setDate(next.getDate() + daysUntilNext);
   return next;
+}
+
+export function calculateWeeklyPeriodStreak(
+  profile: CycleProfile,
+  logs: Array<{ log_date?: string | null }>,
+  asOf: Date = new Date()
+): { currentDays: number; bestDays: number; goal: number; active: boolean; message: string; } {
+  const trackedDates = new Set<string>();
+  for (const date of profile.periodStartDates ?? []) {
+    if (date) trackedDates.add(date);
+  }
+  for (const entry of logs) {
+    if (entry.log_date) trackedDates.add(entry.log_date);
+  }
+
+  const today = startOfDay(asOf);
+  let currentDays = 0;
+  for (let offset = 0; offset < 7; offset += 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - offset);
+    const key = formatDateKey(date);
+    if (!trackedDates.has(key)) break;
+    currentDays += 1;
+  }
+
+  let bestDays = 0;
+  let run = 0;
+  for (let offset = 0; offset < 30; offset += 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - offset);
+    const key = formatDateKey(date);
+    if (trackedDates.has(key)) {
+      run += 1;
+      bestDays = Math.max(bestDays, run);
+    } else {
+      run = 0;
+    }
+  }
+
+  const goal = 7;
+  const active = currentDays >= 3;
+  if (currentDays === 0) {
+    return { currentDays: 0, bestDays, goal, active: false, message: "Start your 7-day streak" };
+  }
+  if (currentDays >= goal) {
+    return { currentDays, bestDays, goal, active: true, message: "7-day streak! Great job" };
+  }
+  return { currentDays, bestDays, goal, active, message: `${currentDays}-day streak` };
 }
 
 /** Sort tasks so ones matching the current phase float to the top, without reordering within groups. */

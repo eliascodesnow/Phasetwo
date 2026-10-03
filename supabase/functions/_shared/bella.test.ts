@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeBellaObservations, enforceBellaResponseSafety, getBellaSafetyResponse, isBellaPersonalDataRequest } from "./bella";
+import { analyzeBellaObservations, enforceBellaResponseSafety, getBellaResources, getBellaSafetyResponse, isBellaPersonalDataRequest, needsBellaSources } from "./bella";
 import type { BellaCycleProfile, BellaSymptomLog } from "./bella";
 
 const profile: BellaCycleProfile = {
@@ -75,5 +75,15 @@ describe("Bella request classification and safety", () => {
     expect(enforceBellaResponseSafety("Start your prescribed medication today.")).toContain("can't recommend medication");
     expect(enforceBellaResponseSafety("Take 400 mg of ibuprofen every six hours.")).toContain("can't recommend medication");
     expect(enforceBellaResponseSafety("You recorded pain on four dates.")).toBe("You recorded pain on four dates.");
+  });
+});
+
+describe("Bella educational sources", () => {
+  it("returns authoritative references relevant to expanded topics", () => {
+    expect(needsBellaSources("What is PMDD?")).toBe(true);
+    expect(getBellaResources("What is PMDD?").map((source) => source.organization)).toContain("U.S. Office on Women's Health");
+    expect(getBellaResources("What are uterine fibroids?").map((source) => source.url)).toContain("https://womenshealth.gov/a-z-topics/uterine-fibroids");
+    expect(getBellaResources("What symptoms can happen?").map((source) => source.url)).toContain("https://www.who.int/news-room/fact-sheets/detail/endometriosis");
+    expect(getBellaResources("What is the weather?")).toHaveLength(2);
   });
 });

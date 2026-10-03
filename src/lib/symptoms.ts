@@ -1,6 +1,7 @@
 import type { CycleProfile, Phase } from "../types";
 import { currentCycleDay, phaseForDay } from "./cycleUtils";
 import { hasSupabaseConfig, supabase } from "./supabase";
+import { LOCAL_GUEST_ID } from "./storage";
 
 export type PainLocation =
   | "lower_abdomen"
@@ -266,8 +267,8 @@ export function buildEmptySymptomLog(
   };
 }
 
-export function hasRemoteSymptomStorage(): boolean {
-  return hasSupabaseConfig;
+export function hasRemoteSymptomStorage(userId?: string): boolean {
+  return hasSupabaseConfig && userId !== LOCAL_GUEST_ID;
 }
 
 function readLocalStorage<T>(key: string, fallback: T): T {
@@ -288,12 +289,12 @@ function writeLocalStorage<T>(key: string, value: T): void {
   }
 }
 
-function getSupabaseClient() {
-  return hasRemoteSymptomStorage() ? supabase : null;
+function getSupabaseClient(userId: string) {
+  return hasRemoteSymptomStorage(userId) ? supabase : null;
 }
 
 export async function fetchLogs(userId: string, sinceDate?: string | Date): Promise<SymptomLog[]> {
-  const client = getSupabaseClient();
+  const client = getSupabaseClient(userId);
   if (!userId) {
     return [];
   }
@@ -326,7 +327,7 @@ export async function fetchLogs(userId: string, sinceDate?: string | Date): Prom
 }
 
 export async function upsertLog(userId: string, log: Partial<SymptomLog>): Promise<SymptomLog> {
-  const client = getSupabaseClient();
+  const client = getSupabaseClient(userId);
   if (!userId) {
     throw new Error("A user id is required to save a symptom log.");
   }
@@ -372,7 +373,7 @@ export async function upsertLog(userId: string, log: Partial<SymptomLog>): Promi
 export async function deleteAllSymptomLogs(userId: string): Promise<void> {
   if (!userId) throw new Error("A user id is required to delete symptom history.");
 
-  const client = getSupabaseClient();
+  const client = getSupabaseClient(userId);
   if (!client) {
     try {
       globalThis.localStorage?.removeItem(`phasetwo:symptom-logs:${userId}`);
@@ -387,7 +388,7 @@ export async function deleteAllSymptomLogs(userId: string): Promise<void> {
 }
 
 export async function saveUserConsent(userId: string, policyVersion = "v1"): Promise<void> {
-  const client = getSupabaseClient();
+  const client = getSupabaseClient(userId);
   if (!userId) {
     return;
   }
@@ -419,7 +420,7 @@ export async function saveUserConsent(userId: string, policyVersion = "v1"): Pro
 }
 
 export async function hasUserConsented(userId: string): Promise<boolean> {
-  const client = getSupabaseClient();
+  const client = getSupabaseClient(userId);
   if (!userId) {
     return false;
   }

@@ -3,23 +3,32 @@ import { AlertTriangle, Trash2 } from "lucide-react";
 import type { AppSettings, CycleProfile } from "../types";
 import { MEDICAL_DISCLAIMER } from "../lib/endoContent";
 import { PartnerInvitationPanel } from "./PartnerInvitationPanel";
+import { SaveChangesButton } from "./SaveChangesButton";
 
 export function SettingsView({
   settings,
   onSettingsChange,
+  isAuthenticated,
   isLinkedPartner,
   onLeavePartnerSync,
   profile,
   onProfileChange,
   onDeleteAccount,
+  onSave,
+  saving,
+  savedAt,
 }: {
   settings: AppSettings;
   onSettingsChange: (settings: AppSettings) => void;
+  isAuthenticated: boolean;
   isLinkedPartner: boolean;
   onLeavePartnerSync: () => Promise<void>;
   profile: CycleProfile;
   onProfileChange: (profile: CycleProfile) => void;
   onDeleteAccount: () => Promise<void>;
+  onSave: () => Promise<void>;
+  saving: boolean;
+  savedAt: Date | null;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -75,7 +84,7 @@ export function SettingsView({
         </section>
 
         <div className="space-y-6">
-          {settings.role === "self" && <PartnerInvitationPanel />}
+          {settings.role === "self" && isAuthenticated && <PartnerInvitationPanel />}
           {settings.role === "partner" && isLinkedPartner && <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6"><h2 className="font-display text-base font-semibold text-zinc-900">Partner sync</h2><p className="mt-2 text-xs leading-relaxed text-zinc-600">This account can view the cycle dates and length shared by your partner. Their symptom logs, notes, and account data remain private.</p><button type="button" disabled={leavingSync} onClick={() => { setLeavingSync(true); setSyncError(""); void onLeavePartnerSync().catch(() => setSyncError("Partner sync could not be disconnected. Please try again.")).finally(() => setLeavingSync(false)); }} className="mt-3 min-h-9 rounded-md border border-zinc-300 px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50">{leavingSync ? "Disconnecting…" : "Disconnect partner sync"}</button>{syncError && <p role="alert" className="mt-2 text-xs text-rose-700">{syncError}</p>}</section>}
           <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6">
             <h2 className="font-display text-base font-semibold text-zinc-900">Privacy and care</h2>
@@ -85,7 +94,9 @@ export function SettingsView({
         </div>
       </div>
 
-      <section className="rounded-xl border border-rose-200 bg-white p-5 shadow-card sm:p-6">
+      <SaveChangesButton onSave={onSave} saving={saving} savedAt={savedAt} />
+
+      {isAuthenticated && <section className="rounded-xl border border-rose-200 bg-white p-5 shadow-card sm:p-6">
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-5 w-5 flex-none text-rose-600" />
           <div className="flex-1">
@@ -94,7 +105,7 @@ export function SettingsView({
             <button type="button" onClick={() => setConfirmOpen(true)} className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-md border border-rose-300 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"><Trash2 className="h-4 w-4" />Delete my account</button>
           </div>
         </div>
-      </section>
+      </section>}
 
       {confirmOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
         <section role="dialog" aria-modal="true" aria-labelledby="delete-account-title" className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-5 shadow-xl sm:p-6">

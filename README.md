@@ -1,10 +1,12 @@
 # PhaseTwo
 
 Cycle tracking, symptom logging, appointment preparation, and invitation-only
-partner cycle sync. Sign in to keep your own app data in your Supabase account.
+partner cycle sync. The app opens without an account and saves guest data in the
+browser on the current device. Sign in to open a separate account workspace and
+use partner cycle sync.
 
-Cycle settings and plans are account-scoped. Symptom logs are private to the
-tracking account. Ask Bella conversations remain in the current browser session
+Cycle settings, plans, and symptom logs stay in the active local or account
+workspace. Ask Bella conversations remain in the current browser session
 and are sent to the PhaseTwo Supabase Edge Function only when a message is sent.
 When a question needs personal context, Bella receives only recent structured
 symptom entries and deterministic pattern counts, never symptom notes or account
@@ -22,7 +24,11 @@ npm run dev
 
 Open the URL it prints (usually `http://localhost:5173`).
 
-## Setting up sign-in and sync
+## Account sign-in
+
+No Supabase setup is needed for local guest use. Guest data remains in that
+browser and is not automatically merged into an account. To enable sign-in,
+cross-device sync, and partner invitations:
 
 1. In Supabase, enable Google and email/password under **Authentication > Providers**.
    Add your Google OAuth client ID and secret to the Google provider.
@@ -69,7 +75,8 @@ Open the URL it prints (usually `http://localhost:5173`).
 4. Copy `.env.local.example` to `.env.local` and set `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_PUBLISHABLE_KEY` from your Supabase project API settings.
 5. Deploy the `bella-chat` and `partner-invites` Supabase Edge Functions.
-6. Restart the dev server and sign in with Google or email.
+6. Restart the dev server. Use **Sign in** in the app when you want to open your
+  account workspace; signing in is not required for local tracking.
 
 Only the Supabase anon/publishable key belongs in the frontend environment. Never
 put a service-role key or Google client secret in `.env.local` variables prefixed

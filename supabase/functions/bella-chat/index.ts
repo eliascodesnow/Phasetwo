@@ -6,7 +6,7 @@ import {
   isBellaAppointmentRequest,
   isBellaPersonalDataRequest,
   needsBellaSources,
-  BELLA_RESOURCES,
+  getBellaResources,
   type BellaCycleProfile,
   type BellaSymptomLog,
 } from "../_shared/bella.ts";
@@ -218,6 +218,7 @@ Deno.serve(async (request: Request) => {
       ? `${text}\n\n${appointmentDisclaimer}`
       : text;
     const sources = needsBellaSources(message) ? BELLA_RESOURCES : [];
+      const sources = needsBellaSources(message) ? getBellaResources(message) : [];
     log(200, "success");
     return json(request, 200, { text: responseText, sources });
   } catch (error) {

@@ -1,7 +1,8 @@
-import { defaultCycleProfile, defaultSettings, loadLocalAppState, saveLocalAppState, type UserAppState } from "./storage";
+import { defaultCycleProfile, defaultSettings, loadLocalAppState, LOCAL_GUEST_ID, saveLocalAppState, type UserAppState } from "./storage";
 import { supabase } from "./supabase";
 
 export async function loadSyncedAppState(userId: string): Promise<UserAppState> {
+  if (userId === LOCAL_GUEST_ID) return loadLocalAppState(userId);
   if (!supabase) throw new Error("Supabase is not configured.");
 
   const localState = loadLocalAppState(userId);
@@ -34,6 +35,7 @@ export async function loadSyncedAppState(userId: string): Promise<UserAppState> 
 
 export async function saveSyncedAppState(userId: string, state: UserAppState): Promise<void> {
   saveLocalAppState(userId, state);
+  if (userId === LOCAL_GUEST_ID) return;
   if (!supabase) throw new Error("Supabase is not configured.");
 
   const { error } = await supabase.from("user_app_state").upsert({

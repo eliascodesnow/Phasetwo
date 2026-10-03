@@ -33,20 +33,86 @@ export type BellaObservations = {
 
 export const BELLA_RESOURCES = [
   {
+    id: "endometriosis-who",
     title: "Endometriosis fact sheet",
     organization: "World Health Organization",
     description: "Overview of symptoms, diagnosis, treatment, and the impact of endometriosis.",
     url: "https://www.who.int/news-room/fact-sheets/detail/endometriosis",
     lastVerified: "2026-09-30",
+    keywords: ["endometriosis", "endo", "pelvic pain", "painful periods", "symptoms"],
   },
   {
+    id: "endometriosis-medline",
     title: "Endometriosis",
     organization: "NIH MedlinePlus",
-    description: "Government health information about symptoms, diagnosis, and treatment.",
+    description: "Government health information about endometriosis.",
     url: "https://medlineplus.gov/endometriosis.html",
     lastVerified: "2026-09-30",
+    keywords: ["endometriosis", "endo", "pelvic pain", "painful periods", "symptoms"],
+  },
+  {
+    id: "periods-nhs",
+    title: "Periods",
+    organization: "NHS",
+    description: "Overview of periods, cycle variation, and changes that may need assessment.",
+    url: "https://www.nhs.uk/conditions/periods/",
+    lastVerified: "2026-10-03",
+    keywords: ["period", "menstruation", "missed period", "irregular period", "heavy bleeding"],
+  },
+  {
+    id: "cycle-owh",
+    title: "Your menstrual cycle",
+    organization: "U.S. Office on Women's Health",
+    description: "Overview of menstrual cycle phases and tracking.",
+    url: "https://womenshealth.gov/menstrual-cycle/your-menstrual-cycle",
+    lastVerified: "2026-10-03",
+    keywords: ["menstrual cycle", "cycle phase", "ovulation", "cycle length"],
+  },
+  {
+    id: "pms-owh",
+    title: "Premenstrual syndrome (PMS)",
+    organization: "U.S. Office on Women's Health",
+    description: "Information about PMS symptoms and evaluation.",
+    url: "https://womenshealth.gov/menstrual-cycle/premenstrual-syndrome",
+    lastVerified: "2026-10-03",
+    keywords: ["pms", "premenstrual syndrome"],
+  },
+  {
+    id: "pmdd-owh",
+    title: "Premenstrual dysphoric disorder (PMDD)",
+    organization: "U.S. Office on Women's Health",
+    description: "Information about PMDD symptoms and professional evaluation.",
+    url: "https://womenshealth.gov/menstrual-cycle/premenstrual-syndrome/premenstrual-dysphoric-disorder-pmdd",
+    lastVerified: "2026-10-03",
+    keywords: ["pmdd", "premenstrual dysphoric disorder"],
+  },
+  {
+    id: "pcos-owh",
+    title: "Polycystic ovary syndrome",
+    organization: "U.S. Office on Women's Health",
+    description: "Government-reviewed information about PCOS symptoms, diagnosis, and care.",
+    url: "https://womenshealth.gov/a-z-topics/polycystic-ovary-syndrome",
+    lastVerified: "2026-10-03",
+    keywords: ["pcos", "polycystic ovary syndrome"],
+  },
+  {
+    id: "fibroids-owh",
+    title: "Uterine fibroids",
+    organization: "U.S. Office on Women's Health",
+    description: "Government-reviewed information about fibroid symptoms and evaluation.",
+    url: "https://womenshealth.gov/a-z-topics/uterine-fibroids",
+    lastVerified: "2026-10-03",
+    keywords: ["fibroid", "fibroids"],
   },
 ] as const;
+
+export function getBellaResources(message: string) {
+  const normalizedMessage = message.toLocaleLowerCase();
+  const matchedResources = BELLA_RESOURCES
+    .filter((resource) => resource.keywords.some((keyword) => normalizedMessage.includes(keyword)))
+    .map(({ id: _id, keywords: _keywords, ...resource }) => resource);
+  return matchedResources.length ? matchedResources : BELLA_RESOURCES.slice(0, 2);
+}
 
 const PELVIC_LOCATIONS = new Set(["lower_abdomen", "ovaries", "hips", "pelvic_pressure"]);
 const GI_SYMPTOMS = new Set(["bloating", "nausea", "bowel_pain"]);
@@ -137,7 +203,7 @@ export function isBellaAppointmentRequest(message: string): boolean {
 }
 
 export function needsBellaSources(message: string): boolean {
-  return /\b(endometriosis|menstrual health|period pain|heavy bleeding|pelvic pain|symptom|diagnos|treatment)\b/i.test(message);
+  return /\b(endometriosis|menstrual health|menstrual cycle|period|pms|pmdd|pcos|polycystic ovary syndrome|fibroid|ovulation|pelvic pain|symptom|diagnos|treatment)\b/i.test(message);
 }
 
 export function enforceBellaResponseSafety(response: string): string {
