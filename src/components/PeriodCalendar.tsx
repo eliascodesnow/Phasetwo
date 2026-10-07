@@ -1,164 +1,92 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, Droplets, Plus } from "lucide-react";
-import type { CycleProfile } from "../types";
-import type { SymptomLog } from "../lib/symptoms";
-import { nextPeriodEstimate } from "../lib/cycleUtils";
+import { describe, expect, it } from "vitest";
+import { classifyDay } from "../components/PeriodCalendar";
+import { calculateWeeklyPeriodStreak, editPeriodStart, recordPeriodStart, removePeriodStart } from "./cycleUtils";
 
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
-const MONTH_FORMATTER = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" });
+describe("period start tracking", () => {
+  const profile = {
+    lastPeriodStart: "2026-08-01",
+    cycleLength: 28,
+    periodLength: 5,
+    ownerLabel: "You",
+    timezone: "UTC",
+    city: "",
+  };
 
-function dateKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function dateAtNoon(key: string): Date {
-  return new Date(`${key}T12:00:00`);
-}
-
-function daysBetween(start: string, date: string): number {
-  return Math.round((dateAtNoon(date).getTime() - dateAtNoon(start).getTime()) / 86400000);
-}
-
-function addMonths(date: Date, count: number): Date {
-  return new Date(date.getFullYear(), date.getMonth() + count, 1, 12);
-}
-
-function monthCells(month: Date): Array<Date | null> {
-  const first = new Date(month.getFullYear(), month.getMonth(), 1, 12);
-  const length = new Date(month.getFullYear(), month.getMonth() + 1, 0, 12).getDate();
-  return [...Array.from({ length: first.getDay() }, () => null), ...Array.from({ length }, (_, index) => new Date(month.getFullYear(), month.getMonth(), index + 1, 12))];
-}
-
-function isPeriodDate(key: string, starts: string[], periodLength: number): boolean {
-  return starts.some((start) => {
-    const elapsed = daysBetween(start, key);
-    return elapsed >= 0 && elapsed < periodLength;
+  it("classifies a past day as recorded inside the current period", () => {
+    expect(classifyDay("2026-10-07", ["2026-10-07"], 5, "2026-10-08", "2026-10-12")).toBe("recorded");
   });
-}
 
-function MonthGrid({
-  month,
-  profile,
-  logs,
-  selectedDate,
-  today,
-  onSelect,
-}: {
-  month: Date;
-  profile: CycleProfile;
-  logs: SymptomLog[];
-  selectedDate: string;
-  today: string;
-  onSelect: (date: string) => void;
-}) {
-  const starts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
-  const estimatedStart = dateKey(nextPeriodEstimate(profile));
+  it("classifies today as recorded inside the current period", () => {
+    expect(classifyDay("2026-10-08", ["2026-10-07"], 5, "2026-10-08", "2026-10-12")).toBe("recorded");
+  });
 
-  return (
-    <div>
-      <h3 className="mb-3 font-display text-sm font-semibold text-zinc-800">{MONTH_FORMATTER.format(month)}</h3>
-      <div className="grid grid-cols-7 gap-1 text-center">
-        {WEEKDAYS.map((weekday, index) => <span key={`${weekday}-${index}`} className="py-1 text-[10px] font-semibold uppercase text-zinc-400">{weekday}</span>)}
-        {monthCells(month).map((date, index) => {
-          if (!date) return <span key={`empty-${index}`} className="aspect-square" />;
-          const key = dateKey(date);
-          const period = isPeriodDate(key, starts, profile.periodLength);
-          const estimated = daysBetween(estimatedStart, key) >= 0 && daysBetween(estimatedStart, key) < profile.periodLength && key > today && !period;
-          const log = logs.find((entry) => entry.log_date === key);
-          const pain = Boolean(log && log.pain_score > 0);
-          const selected = key === selectedDate;
-          const dayTone = period
-            ? "bg-[#b96070] text-white"
-            : estimated
-              ? "bg-[#f5dce0] text-[#8b4653]"
-              : key === today
-                ? "bg-sage text-white"
-                : "text-zinc-700 hover:bg-sage-light";
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onSelect(key)}
-              aria-label={`${MONTH_FORMATTER.format(month)} ${date.getDate()}${period ? ", recorded period" : estimated ? ", estimated period" : ""}${pain ? `, pain ${log?.pain_score} out of 10` : ""}`}
-              aria-pressed={selected}
-              className={`relative flex aspect-square min-h-9 items-center justify-center rounded-full text-xs transition-colors sm:min-h-10 ${dayTone} ${selected ? "ring-2 ring-offset-2 ring-sage-dark" : ""} ${key > today && !estimated && !period ? "text-zinc-300" : ""}`}
-            >
-              {date.getDate()}
-              {pain && <span className={`absolute bottom-1 h-1 w-1 rounded-full ${period || key === today ? "bg-white" : "bg-[#b96070]"}`} />}
-              {starts.includes(key) && <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-white ring-1 ring-[#b96070]" />}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+  it("classifies a future day in the current period window as estimated", () => {
+    expect(classifyDay("2026-10-09", ["2026-10-07"], 5, "2026-10-08", "2026-10-12")).toBe("estimated");
+  });
 
-export function PeriodCalendar({
-  profile,
-  logs,
-  onRecordPeriodStart,
-  showRecordButton = true,
-}: {
-  profile: CycleProfile;
-  logs: SymptomLog[];
-  onRecordPeriodStart: (date: string) => void;
-  showRecordButton?: boolean;
-}) {
-  const today = dateKey(new Date());
-  const [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12));
-  const [selectedDate, setSelectedDate] = useState(today);
-  const [twoMonths, setTwoMonths] = useState(true);
-  const starts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
-  const selectedLog = logs.find((log) => log.log_date === selectedDate);
-  const selectedIsPeriod = isPeriodDate(selectedDate, starts, profile.periodLength);
-  const estimatedStart = dateKey(nextPeriodEstimate(profile));
-  const selectedIsEstimated = daysBetween(estimatedStart, selectedDate) >= 0
-    && daysBetween(estimatedStart, selectedDate) < profile.periodLength
-    && selectedDate > today;
+  it("classifies a future day in the next predicted period as estimated without double counting", () => {
+    expect(classifyDay("2026-10-12", ["2026-10-07"], 5, "2026-10-08", "2026-10-12")).toBe("estimated");
+  });
 
-  return (
-    <section className="rounded-xl border border-zinc-200 bg-white p-4 shadow-card sm:p-6" aria-label="Period calendar">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1">
-          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, -1))} aria-label="Previous month" className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100"><ChevronLeft className="h-4 w-4" /></button>
-          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, 1))} aria-label="Next month" className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100"><ChevronRight className="h-4 w-4" /></button>
-        </div>
-        <label className="flex items-center gap-2 text-xs font-medium text-zinc-500">
-          <input type="checkbox" checked={twoMonths} onChange={(event) => setTwoMonths(event.target.checked)} className="h-4 w-4 accent-[#4A6B5D]" />
-          Two-month view
-        </label>
-      </div>
+  it("returns none for a day outside all period windows", () => {
+    expect(classifyDay("2026-10-15", ["2026-10-07"], 5, "2026-10-08", "2026-10-12")).toBe("none");
+  });
 
-      <div className={`grid gap-6 ${twoMonths ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 max-w-md"}`}>
-        <MonthGrid month={visibleMonth} profile={profile} logs={logs} selectedDate={selectedDate} today={today} onSelect={setSelectedDate} />
-        {twoMonths && <MonthGrid month={addMonths(visibleMonth, 1)} profile={profile} logs={logs} selectedDate={selectedDate} today={today} onSelect={setSelectedDate} />}
-      </div>
+  it("records period starts and updates the observed cycle length", () => {
+    const updated = recordPeriodStart(profile, "2026-09-01");
 
-      <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-zinc-100 pt-4 text-[11px] text-zinc-500">
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#b96070]" />Recorded period</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#f5dce0]" />Estimated period</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sage" />Today</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#b96070]" />Pain log</span>
-      </div>
+    expect(updated.lastPeriodStart).toBe("2026-09-01");
+    expect(updated.periodStartDates).toEqual(["2026-08-01", "2026-09-01"]);
+    expect(updated.cycleLength).toBe(31);
+  });
 
-      <div className="mt-4 flex flex-col justify-between gap-3 rounded-lg bg-[#fbf7f5] p-3 sm:flex-row sm:items-center">
-        <div className="flex items-start gap-2 text-sm text-zinc-700">
-          <Droplets className="mt-0.5 h-4 w-4 flex-none text-[#b96070]" />
-          <div>
-            <p className="font-medium">{new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(dateAtNoon(selectedDate))}</p>
-            <p className="mt-0.5 text-xs text-zinc-500">
-              {selectedIsPeriod ? "Recorded period day" : selectedIsEstimated ? "Estimated period day" : "No period recorded"}
-              {selectedLog ? ` · Pain ${selectedLog.pain_score}/10 · ${selectedLog.bleeding ?? "No bleeding entry"} bleeding` : " · No pain log"}
-            </p>
-          </div>
-        </div>
-        {showRecordButton && (
-          <button type="button" disabled={selectedDate > today} onClick={() => onRecordPeriodStart(selectedDate)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#b96070] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a95263] disabled:cursor-not-allowed disabled:opacity-40">
-            <Plus className="h-4 w-4" />Record period
-          </button>
-        )}
-      </div>
-    </section>
-  );
-}
+  it("does not duplicate a period start logged for the same date", () => {
+    const updated = recordPeriodStart(
+      { ...profile, periodStartDates: ["2026-08-01", "2026-09-01"], lastPeriodStart: "2026-09-01" },
+      "2026-09-01"
+    );
+
+    expect(updated.periodStartDates).toEqual(["2026-08-01", "2026-09-01"]);
+  });
+
+  it("edits a recorded date and recalculates the latest start", () => {
+    const updated = editPeriodStart(
+      { ...profile, periodStartDates: ["2026-08-01", "2026-09-01"], lastPeriodStart: "2026-09-01" },
+      "2026-09-01",
+      "2026-09-03",
+    );
+
+    expect(updated.periodStartDates).toEqual(["2026-08-01", "2026-09-03"]);
+    expect(updated.lastPeriodStart).toBe("2026-09-03");
+    expect(updated.cycleLength).toBe(33);
+  });
+
+  it("removes a recorded date while keeping the remaining latest date", () => {
+    const updated = removePeriodStart(
+      { ...profile, periodStartDates: ["2026-08-01", "2026-09-01"], lastPeriodStart: "2026-09-01" },
+      "2026-09-01",
+    );
+
+    expect(updated.periodStartDates).toEqual(["2026-08-01"]);
+    expect(updated.lastPeriodStart).toBe("2026-08-01");
+  });
+
+  it("counts a weekly streak when the user records a period or check-in on consecutive days", () => {
+    const result = calculateWeeklyPeriodStreak(
+      { ...profile, periodStartDates: ["2026-08-27", "2026-08-28"] },
+      [
+        { log_date: "2026-08-25" },
+        { log_date: "2026-08-26" },
+        { log_date: "2026-08-27" },
+        { log_date: "2026-08-28" },
+        { log_date: "2026-08-29" },
+      ],
+      new Date("2026-08-29T12:00:00Z")
+    );
+
+    expect(result.currentDays).toBe(5);
+    expect(result.goal).toBe(7);
+    expect(result.active).toBe(true);
+    expect(result.message).toContain("5-day streak");
+  });
+});
