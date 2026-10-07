@@ -142,10 +142,10 @@ export function PeriodCalendar({
     <section className="rounded-xl border border-zinc-200 bg-white p-4 shadow-card sm:p-6" aria-label="Period calendar">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, -1))} aria-label="Previous month" className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100">
+          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, -1))} aria-label="Previous month" className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100">
             <ChevronLeft className="h-4 w-4" strokeWidth={1.75} />
           </button>
-          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, 1))} aria-label="Next month" className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100">
+          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, 1))} aria-label="Next month" className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100">
             <ChevronRight className="h-4 w-4" strokeWidth={1.75} />
           </button>
         </div>
@@ -179,7 +179,7 @@ export function PeriodCalendar({
           </div>
         </div>
         {showRecordButton && (
-          <button type="button" disabled={selectedDate > today} onClick={() => onRecordPeriodStart(selectedDate)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#b96070] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#a85060] disabled:bg-zinc-300 disabled:cursor-not-allowed">
+          <button type="button" disabled={selectedDate > today} onClick={() => onRecordPeriodStart(selectedDate)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#b96070] px-4 text-sm font-medium text-white transition-colors hover:bg-[#a74d5e] disabled:opacity-50 disabled:cursor-not-allowed">
             <Plus className="h-4 w-4" />Record period
           </button>
         )}
