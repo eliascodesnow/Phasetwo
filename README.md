@@ -65,6 +65,11 @@ cross-device sync, and partner invitations:
      symptom logs, and to read or save their own health-consent record. RLS
      policies continue to enforce per-user access; anonymous access is revoked.
      The migration also asks PostgREST to reload its schema cache.
+   - `0007_partner_invite_code_and_acceptance.sql`: Adds the normalized
+     `invite_code` column and unique format constraint, creates the
+     `accept_cycle_invitation(p_code text)` security-definer RPC, and removes
+     conflicting authenticated table grants while retaining RLS and service-role
+     access for invite management.
 
    For an existing project, check its migration history first and apply only
    migrations that have not already been recorded. Review and back up existing
@@ -128,15 +133,21 @@ education, do not use personal tracking data, and link to authoritative sources.
 ## Partner invitations
 
 Each person signs in with their own PhaseTwo account. In **Settings**, the cycle
-owner enters the partner's account email, creates an invitation, and privately
-sends the generated link to that address. The recipient must be signed in with
-that exact, email-verified account to accept. Links expire after 14 days and can
-be revoked. Acceptance provides read-only cycle dates and length only; symptom
-logs, notes, tasks, chat, and other account data are not shared. The partner may
-disconnect at any time.
+owner enters the partner's account email and creates an invitation. The edge
+function validates the address, rejects self-invites and duplicate links,
+generates a single-use 14-day invite code, and sends it from
+`PhaseTwo <mail@phasetwo.space>`. The owner copies the code and shares it
+privately with the invited person.
 
-Do not share an invitation link publicly: it is a bearer token bound to the
-invited email address.
+The invited person opens **Settings**, enters the code, and authenticates with
+that account. The `accept_cycle_invitation(p_code text)` RPC accepts codes with
+or without the dash, any case, and marks the invite as single-use. Accepted
+accounts receive read-only cycle dates and length only; symptom logs, notes,
+tasks, chat, and other account data remain private. The owner may revoke or
+resend the invitation, and either party may disconnect at any time.
+
+Never share an invite code publicly. It is not a bearer token and is not
+returned by an unrestricted table query.
 
 ## Building for production
 

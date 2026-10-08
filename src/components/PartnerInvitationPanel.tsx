@@ -1,8 +1,16 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Check, Copy, LoaderCircle, MailPlus, RotateCcw, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { formatInviteCode, mapPartnerInviteError } from "../lib/partnerInvite";
 
-type Invitation = { email: string; accepted: boolean; expiresAt: string; token: string | null };
+type Invitation = { email: string; code: string; expires_at: string };
+
+type PartnerInviteResult = {
+  ok?: boolean;
+  expires_at?: string;
+  error?: string;
+  invitation?: Invitation | null;
+};
 
 export function PartnerInvitationPanel() {
   const [email, setEmail] = useState("");
@@ -14,8 +22,12 @@ export function PartnerInvitationPanel() {
 
   async function refreshStatus() {
     if (!supabase) return;
-    const { data } = await supabase.functions.invoke<{ invitation: Invitation | null }>("partner-invites", { body: { action: "status" } });
-    if (data) setInvitation(data.invitation);
+    const { data, error } = await supabase.functions.invoke<PartnerInviteResult>("partner-invites", { body: { action: "status" } });
+    if (error) {
+      if (import.meta.env.DEV) console.error("partner-invites status failed", error);
+      return;
+    }
+    setInvitation(data?.invitation ?? null);
   }
 
   useEffect(() => {
@@ -30,44 +42,50 @@ export function PartnerInvitationPanel() {
     setBusy(true);
     setError("");
     setNotice("");
-    const { data, error: invokeError } = await supabase.functions.invoke<{ token: string; expiresAt: string }>("partner-invites", {
-      body: { action: "create", email: email.trim() },
+    const nextEmail = email.trim();
+    const { data, error: invokeError } = await supabase.functions.invoke<PartnerInviteResult>("partner-invites", {
+      body: { action: "create", email: nextEmail },
     });
     setBusy(false);
-    if (invokeError || !data?.token) {
-      setError("We couldn’t create that invitation. Check the email and try again.");
+    if (invokeError || !data?.ok) {
+      const code = data?.error ?? (invokeError as { message?: string } | undefined)?.message;
+      if (import.meta.env.DEV) console.error("partner-invites create failed", invokeError ?? data, code);
+      setError(mapPartnerInviteError(code ?? ""));
       return;
     }
-    const next = { email: email.trim(), accepted: false, expiresAt: data.expiresAt, token: data.token };
-    setInvitation(next);
-    setNotice("Invitation link created. Send it only to the invited email address.");
+    setNotice("Invitation sent. Share the code below with the invited person.");
+    await refreshStatus();
   }
 
-  async function copyInvite() {
-    if (!invitation?.token) return;
-    const url = new URL(window.location.href);
-    url.searchParams.set("cycleInvite", invitation.token);
-    url.hash = "";
-    try {
-      await navigator.clipboard.writeText(url.toString());
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setError("Copy failed. Select and copy the invitation link manually.");
+  async function resendInvite() {
+    if (!supabase || !invitation || busy) return;
+    setBusy(true);
+    setError("");
+    const { data, error } = await supabase.functions.invoke<PartnerInviteResult>("partner-invites", {
+      body: { action: "resend", email: invitation.email },
+    });
+    setBusy(false);
+    if (error || !data?.ok) {
+      const code = data?.error ?? (error as { message?: string } | undefined)?.message;
+      if (import.meta.env.DEV) console.error("partner-invites resend failed", error ?? data, code);
+      setError(mapPartnerInviteError(code ?? ""));
+      return;
     }
+    setInvitation((current) => current ? { ...current, expires_at: data.expires_at ?? current.expires_at } : current);
+    setNotice("The invitation email has been resent.");
   }
 
   async function revokeInvite() {
-    if (!supabase || !invitation?.token || busy) return;
-    if (!window.confirm("Revoke this invitation and disconnect its cycle sync?")) return;
+    if (!supabase || !invitation || busy) return;
+    if (!window.confirm("Revoke this invitation?")) return;
     setBusy(true);
     setError("");
-    const { error: invokeError } = await supabase.functions.invoke("partner-invites", {
-      body: { action: "revoke", token: invitation.token },
-    });
+    const { data, error } = await supabase.functions.invoke<PartnerInviteResult>("partner-invites", { body: { action: "revoke" } });
     setBusy(false);
-    if (invokeError) {
-      setError("The invitation could not be revoked. Please try again.");
+    if (error || !data?.ok) {
+      const code = data?.error ?? (error as { message?: string } | undefined)?.message;
+      if (import.meta.env.DEV) console.error("partner-invites revoke failed", error ?? data, code);
+      setError(mapPartnerInviteError(code ?? ""));
       return;
     }
     setInvitation(null);
@@ -80,21 +98,20 @@ export function PartnerInvitationPanel() {
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage-light text-sage-dark"><MailPlus className="h-4 w-4" /></div>
         <div className="min-w-0 flex-1">
           <h2 className="font-display text-base font-semibold text-zinc-900">Partner sync</h2>
-          <p className="mt-1 text-xs leading-relaxed text-zinc-600">Your partner uses their own PhaseTwo account. Invite their account email to share your cycle dates and length; symptom logs, notes, and other account data stay private. The invitation itself is not emailed.</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-600">Invite by account email, then share the single-use code. The code expires after 14 days.</p>
         </div>
       </div>
 
-      {invitation?.accepted ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sage/25 bg-sage-light/40 px-3 py-3">
-          <p className="text-sm text-sage-dark"><Check className="mr-1.5 inline h-4 w-4" />Synced with {invitation.email}</p>
-          <button type="button" onClick={() => void revokeInvite()} disabled={busy} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"><X className="h-3.5 w-3.5" />Disconnect</button>
-        </div>
-      ) : invitation?.token ? (
+      {invitation ? (
         <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-          <p className="text-sm font-medium text-zinc-800">{invitation.accepted ? `Synced with ${invitation.email}` : `Invite sent to ${invitation.email}`}</p>
-          <p className="mt-1 text-xs text-zinc-500">{invitation.accepted ? "Their account can view your cycle dates and length only." : `Expires ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(invitation.expiresAt))}. The recipient must sign in using this exact email.`}</p>
+          <p className="text-sm font-medium text-zinc-800">Invitation for {invitation.email}</p>
+          <p className="mt-1 text-xs text-zinc-500">Expires {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(invitation.expires_at))}</p>
+          <div className="mt-3 flex items-center gap-2 rounded-md border border-sage/25 bg-white px-3 py-2">
+            <span className="font-mono text-sm font-semibold tracking-wider text-sage-dark">{formatInviteCode(invitation.code)}</span>
+            <button type="button" onClick={() => void navigator.clipboard.writeText(invitation.code).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1800); }).catch(() => setError("Copy failed. Select and copy the code manually."))} className="ml-auto inline-flex min-h-8 items-center gap-1 rounded-md border border-zinc-200 px-2 text-xs font-medium text-zinc-700">{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "Copied" : "Copy code"}</button>
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={() => void copyInvite()} className="inline-flex min-h-9 items-center gap-2 rounded-md bg-slate px-3 text-xs font-medium text-white hover:bg-zinc-800">{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "Copied" : "Copy invite link"}</button>
+            <button type="button" onClick={() => void resendInvite()} disabled={busy} className="inline-flex min-h-9 items-center gap-2 rounded-md bg-slate px-3 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Resend email</button>
             <button type="button" onClick={() => void revokeInvite()} disabled={busy} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-zinc-300 px-3 text-xs text-zinc-600 hover:bg-white disabled:opacity-50"><X className="h-3.5 w-3.5" />Revoke</button>
           </div>
         </div>

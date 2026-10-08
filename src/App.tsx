@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { CalendarDays, Chrome, Cloud, FileText, HeartPulse, Home, LogOut, Leaf, LogIn, Settings, ShieldCheck } from "lucide-react";
+import { CalendarDays, Cloud, FileText, HeartPulse, Home, LogOut, Leaf, LogIn, Settings, ShieldCheck } from "lucide-react";
 import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
 import { defaultCycleProfile, defaultSettings } from "./lib/storage";
 import { CycleHeader } from "./components/CycleHeader";
@@ -52,7 +52,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const deletingAccount = useRef(false);
-  const inviteProcessing = useRef(false);
   const symptomSaveAction = useRef<SymptomLoggerSaveRef["current"]>(null);
 
   useEffect(() => {
@@ -84,39 +83,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       ignore = true;
     };
   }, [userId]);
-
-  useEffect(() => {
-    if (!appReady || deletingAccount.current || !supabase || !isAuthenticated) return;
-    const client = supabase;
-    let token: string | null = null;
-    try {
-      token = window.sessionStorage.getItem("phasetwo:cycle-invite");
-    } catch {
-      token = new URLSearchParams(window.location.search).get("cycleInvite");
-    }
-    if (!token || inviteProcessing.current) return;
-    inviteProcessing.current = true;
-    if (!window.confirm("Accept this private cycle invitation for your PhaseTwo account?")) {
-      try { window.sessionStorage.removeItem("phasetwo:cycle-invite"); } catch { /* No tab storage available. */ }
-      return;
-    }
-
-    void client.functions.invoke("partner-invites", { body: { action: "accept", token } })
-      .then(async ({ error }) => {
-        if (error) throw error;
-        const { data, error: cycleError } = await client.rpc("get_my_shared_cycle_profile");
-        if (cycleError || !data) throw cycleError ?? new Error("Cycle sync is unavailable.");
-        const remote = data as Partial<CycleProfile>;
-        if (typeof remote.lastPeriodStart !== "string" || typeof remote.cycleLength !== "number") {
-          throw new Error("The invitation does not contain a valid cycle profile.");
-        }
-        setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "" });
-        setSettings((current) => ({ ...current, role: "partner", ldrEnabled: true }));
-        setSyncError("");
-        try { window.sessionStorage.removeItem("phasetwo:cycle-invite"); } catch { /* No tab storage available. */ }
-      })
-      .catch(() => setSyncError("We couldn’t accept that invitation. Sign in with the invited email and try again."));
-  }, [appReady, isAuthenticated]);
 
   useEffect(() => {
     if (!appReady || !supabase || !isAuthenticated) return;
@@ -254,6 +220,24 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     setSettings((current) => ({ ...current, role: "self" }));
   }
 
+  async function refreshPartnerLink() {
+    if (!supabase) return;
+    const { data, error } = await supabase.rpc("get_my_shared_cycle_profile");
+    if (error || !data || typeof data !== "object") {
+      setSharedCycleProfile(null);
+      setSettings((current) => ({ ...current, role: "self" }));
+      return;
+    }
+    const remote = data as Partial<CycleProfile>;
+    if (typeof remote.lastPeriodStart !== "string" || typeof remote.cycleLength !== "number") {
+      setSharedCycleProfile(null);
+      setSettings((current) => ({ ...current, role: "self" }));
+      return;
+    }
+    setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "" });
+    setSettings((current) => ({ ...current, role: "partner", ldrEnabled: true }));
+  }
+
   const showLdr = settings.role === "partner" && settings.ldrEnabled;
   const displayedProfile = showLdr && sharedCycleProfile ? sharedCycleProfile : profile;
 
@@ -304,7 +288,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           </div>
           <p className="mt-4 text-sm leading-6 text-zinc-600">Use your account to sync cycle data across devices and keep your weekly streak going.</p>
           <div className="mt-5 space-y-3">
-            <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-60"><Chrome className="h-4 w-4" />Continue with Google</button>
+            <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-60"><svg aria-hidden="true" viewBox="0 0 48 48" className="h-4 w-4"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.2l5.7-5.7C34.9 3.8 29.9 1.5 24 1.5 12.4 1.5 3 10.9 3 22.5S12.4 43.5 24 43.5c11.1 0 20.5-8.1 20.5-20.5 0-1.4-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.5 14.6l6.9 5.1C15.4 16 19.3 13.5 24 13.5c3.1 0 5.9 1.2 8 3.2l5.7-5.7C34.9 3.8 29.9 1.5 24 1.5c-7.2 0-13.5 3.9-17 9.6z"/><path fill="#4CAF50" d="M24 43.5c5.7 0 10.6-1.9 14.1-5.2l-6.5-5.5c-2 1.4-4.6 2.2-7.6 2.2-5.3 0-9.7-3.4-11.3-8l-6.7 5.1C6.1 38.7 14.1 43.5 24 43.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1 2.9-3.6 5.1-6.9 6l6.5 5.5c3.9-3.6 6.6-8.9 6.6-15.5 0-1.4-.1-2.7-.4-4z"/></svg>Continue with Google</button>
             <form className="space-y-3" onSubmit={(event) => void handleEmailSignIn(event)}>
               <label className="block text-sm font-medium text-zinc-700">Email<input name="email" type="email" autoComplete="email" required className="mt-1.5 min-h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none transition focus:border-sage" /></label>
               {loginError && <p role="alert" className="text-sm text-rose-700">{loginError}</p>}
@@ -332,7 +316,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
         {activeView === "history" && <HistoryView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("home"); }} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
         {activeView === "report" && <ReportView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} />}
-        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
+        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
 
         {activeView === "home" && settings.role === "self" && <EndometriosisAwareness logs={symptomLogs} profile={profile} />}
       </main>

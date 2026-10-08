@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import type { AppSettings, CycleProfile } from "../types";
 import { MEDICAL_DISCLAIMER } from "../lib/endoContent";
+import { supabase } from "../lib/supabase";
 import { PartnerInvitationPanel } from "./PartnerInvitationPanel";
 import { SaveChangesButton } from "./SaveChangesButton";
 
@@ -11,6 +12,7 @@ export function SettingsView({
   isAuthenticated,
   isLinkedPartner,
   onLeavePartnerSync,
+  onPartnerLinked,
   profile,
   onProfileChange,
   onDeleteAccount,
@@ -23,6 +25,7 @@ export function SettingsView({
   isAuthenticated: boolean;
   isLinkedPartner: boolean;
   onLeavePartnerSync: () => Promise<void>;
+  onPartnerLinked: () => Promise<void>;
   profile: CycleProfile;
   onProfileChange: (profile: CycleProfile) => void;
   onDeleteAccount: () => Promise<void>;
@@ -36,6 +39,10 @@ export function SettingsView({
   const [deleteError, setDeleteError] = useState("");
   const [leavingSync, setLeavingSync] = useState(false);
   const [syncError, setSyncError] = useState("");
+  const [partnerCode, setPartnerCode] = useState("");
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [linkNotice, setLinkNotice] = useState("");
 
   async function deleteAccount() {
     if (confirmation !== "DELETE") return;
@@ -86,6 +93,29 @@ export function SettingsView({
         <div className="space-y-6">
           {settings.role === "self" && isAuthenticated && <PartnerInvitationPanel />}
           {settings.role === "partner" && isLinkedPartner && <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6"><h2 className="font-display text-base font-semibold text-zinc-900">Partner sync</h2><p className="mt-2 text-xs leading-relaxed text-zinc-600">This account can view the cycle dates and length shared by your partner. Their symptom logs, notes, and account data remain private.</p><button type="button" disabled={leavingSync} onClick={() => { setLeavingSync(true); setSyncError(""); void onLeavePartnerSync().catch(() => setSyncError("Partner sync could not be disconnected. Please try again.")).finally(() => setLeavingSync(false)); }} className="mt-3 min-h-9 rounded-md border border-zinc-300 px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50">{leavingSync ? "Disconnecting…" : "Disconnect partner sync"}</button>{syncError && <p role="alert" className="mt-2 text-xs text-rose-700">{syncError}</p>}</section>}
+          {isAuthenticated && settings.role === "self" && !isLinkedPartner && <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6">
+            <h2 className="font-display text-base font-semibold text-zinc-900">Enter a partner code</h2>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-600">Your partner shares the code from their invitation email. It can be used once and expires after 14 days.</p>
+            <form className="mt-4 space-y-3" onSubmit={async (event) => {
+              event.preventDefault();
+              if (!supabase || linking) return;
+              setLinking(true); setLinkError(""); setLinkNotice("");
+              const { error } = await supabase.rpc("accept_cycle_invitation", { p_code: partnerCode });
+              setLinking(false);
+              if (error) {
+                setLinkError(error.message || "That invite code could not be accepted.");
+                return;
+              }
+              setLinkNotice("Partner cycle linked. Your account can now view the shared cycle.");
+              setPartnerCode("");
+              await onPartnerLinked();
+            }}>
+              <input value={partnerCode} onChange={(event) => setPartnerCode(event.target.value)} placeholder="K7M2-QX9P" autoComplete="one-time-code" maxLength={9} className="min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm uppercase placeholder:text-zinc-400 focus:border-sage focus:outline-none" />
+              <button type="submit" disabled={linking || partnerCode.trim().length === 0} className="inline-flex min-h-10 items-center justify-center rounded-md bg-sage-dark px-4 text-sm font-medium text-white disabled:opacity-50">{linking ? "Linking…" : "Accept partner code"}</button>
+              {linkError && <p role="alert" className="text-xs text-rose-700">{linkError}</p>}
+              {linkNotice && <p role="status" className="text-xs text-sage-dark">{linkNotice}</p>}
+            </form>
+          </section>}
           <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6">
             <h2 className="font-display text-base font-semibold text-zinc-900">Privacy and care</h2>
             <p className="mt-3 text-xs leading-relaxed text-zinc-600">Symptom history is private to your account. An accepted partner invitation shares only cycle dates and length. Delete symptom entries from Home or History.</p>
