@@ -330,9 +330,9 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           </div>
         </>}
 
-        {activeView === "history" && <HistoryView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("home"); }} />}
+        {activeView === "history" && <HistoryView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("home"); }} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
         {activeView === "report" && <ReportView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} />}
-        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartner={leavePartnerSync} onRefreshPartnerLink={refreshPartnerLink} />}
+        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
 
         {activeView === "home" && settings.role === "self" && <EndometriosisAwareness logs={symptomLogs} profile={profile} />}
       </main>
