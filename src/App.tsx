@@ -263,14 +263,14 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           </div>
           {activeView !== "login" && <nav aria-label="Main navigation" className="order-3 flex w-full items-center gap-1 overflow-x-auto sm:order-2 sm:w-auto">
             {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
-              <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "home") setEditingLogDate(undefined); setActiveView(key); }} className={...}>
+              <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "home") setEditingLogDate(undefined); setActiveView(key); }} className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${activeView === key ? "bg-zinc-100 text-zinc-900" : "text-zinc-600 hover:bg-zinc-50"}`}>
                 <Icon className="h-4 w-4" strokeWidth={1.8} />{label}
               </button>
             ))}
           </nav>}
           {!isAuthenticated && supabase && activeView === "login" ? <button type="button" onClick={() => setActiveView("home")} className="order-2 inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 sm:order-2">
             Back to app
-          </button> : <button
+          </button> : isAuthenticated && <button
             type="button"
             onClick={() => void signOut()}
             aria-label="Sign out"
@@ -296,12 +296,14 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           </div>
           <p className="mt-4 text-sm leading-6 text-zinc-600">Use your account to sync cycle data across devices and keep your weekly streak going.</p>
           <div className="mt-5 space-y-3">
-            <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50">
+            <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">
               <Cloud className="h-4 w-4" strokeWidth={2} />
               Continue with Google
             </button>
             <form className="space-y-3" onSubmit={(event) => void handleEmailSignIn(event)}>
-              <label className="block text-sm font-medium text-zinc-700">Email<input name="email" type="email" autoComplete="email" required className="mt-1.5 min-h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-sage-dark focus:ring-2 focus:ring-sage/20" /></label>
+              <label className="block text-sm font-medium text-zinc-700">Email
+                <input name="email" type="email" autoComplete="email" required className="mt-1.5 min-h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-sage-dark focus:ring-2 focus:ring-sage/20" />
+              </label>
               {loginError && <p role="alert" className="text-sm text-rose-700">{loginError}</p>}
               {loginMessage && <p role="status" className="text-sm text-sage-dark">{loginMessage}</p>}
               <button type="submit" disabled={loginBusy} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-sage-dark px-4 text-sm font-medium text-white transition-colors hover:bg-sage-darker disabled:cursor-not-allowed disabled:opacity-60">
