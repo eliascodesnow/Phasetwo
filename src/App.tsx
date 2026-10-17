@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { CalendarDays, Cloud, FileText, HeartPulse, Home, LogOut, Leaf, LogIn, Settings, ShieldCheck } from "lucide-react";
+import { CalendarDays, Cloud, FileText, HeartPulse, Home, ListTodo, LogOut, Leaf, LogIn, MoreHorizontal, Settings, ShieldCheck } from "lucide-react";
+import { Analytics } from "@vercel/analytics/react";
 import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
 import { defaultCycleProfile, defaultSettings } from "./lib/storage";
 import { CycleHeader } from "./components/CycleHeader";
@@ -20,17 +21,14 @@ import { loadSyncedAppState, saveSyncedAppState } from "./lib/userData";
 import { recordPeriodStart } from "./lib/cycleUtils";
 import type { SymptomLog } from "./lib/symptoms";
 import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
-import { CommunityView } from "./components/CommunityView";
 
 const SELF_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const COMMUNITY_ENABLED = import.meta.env.VITE_COMMUNITY_ENABLED === "true";
-type WorkspaceView = "today" | "calendar" | "planner" | "community" | "history" | "report" | "settings" | "login";
+type WorkspaceView = "today" | "calendar" | "planner" | "history" | "report" | "settings" | "login";
 
 const WORKSPACE_TABS: Array<{ key: WorkspaceView; label: string; icon: typeof Home }> = [
   { key: "today", label: "Today", icon: Home },
   { key: "calendar", label: "Calendar", icon: CalendarDays },
   { key: "planner", label: "Planner", icon: ListTodo },
-  ...(COMMUNITY_ENABLED ? [{ key: "community" as const, label: "Community", icon: UsersRound }] : []),
   { key: "history", label: "History", icon: FileText },
   { key: "settings", label: "Settings", icon: Settings },
 ];
@@ -374,8 +372,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
         {activeView === "planner" && <section className="space-y-5"><div><p className="text-sm font-medium text-sage-dark">Plans that can flex</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Planner</h1><p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">Cycle-phase suggestions describe typical patterns, not a promise about your energy. Adjust plans to how you feel.</p></div><TaskPlanner profile={displayedProfile} tasks={tasks} onChange={setTasks} /></section>}
 
-        {COMMUNITY_ENABLED && activeView === "community" && <CommunityView isAuthenticated={isAuthenticated} onSignIn={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} />}
-
         {activeView === "history" && <HistoryView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("today"); }} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
         {activeView === "report" && <ReportView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} displayName={settings.displayName} age={settings.age} />}
         {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
@@ -438,12 +434,12 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       </div>}
 
       {activeView !== "login" && <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-base px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-        <div className={`mx-auto grid max-w-lg ${COMMUNITY_ENABLED ? "grid-cols-5" : "grid-cols-4"}`}>
+        <div className={`mx-auto grid max-w-lg grid-cols-4`}>
           {[
             { key: "today" as const, label: "Today", icon: Home },
             { key: "calendar" as const, label: "Calendar", icon: CalendarDays },
             { key: "log" as const, label: "Log", icon: HeartPulse },
-            ...(COMMUNITY_ENABLED ? [{ key: "community" as const, label: "Community", icon: UsersRound }] : [{ key: "planner" as const, label: "Planner", icon: ListTodo }]),
+            { key: "planner" as const, label: "Planner", icon: ListTodo },
           ].map(({ key, label, icon: Icon }) => (
             <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { setMoreOpen(false); if (key === "log") { setEditingLogDate(undefined); setFocusCheckin(true); setActiveView("today"); } else setActiveView(key); }} className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium ${activeView === key || (key === "log" && focusCheckin) ? "text-sage-dark" : "text-zinc-500"}`}>
               <Icon className="h-5 w-5" strokeWidth={1.8} />{label}
@@ -453,7 +449,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         </div>
       </nav>}
       {moreOpen && <div role="menu" aria-label="More destinations" className="fixed bottom-[4.5rem] right-3 z-50 w-52 rounded-lg border border-zinc-200 bg-white p-2 shadow-xl lg:hidden">
-        {[...(COMMUNITY_ENABLED ? [{ key: "planner" as const, label: "Planner", icon: ListTodo }] : []), { key: "history" as const, label: "History", icon: FileText }, { key: "report" as const, label: "Health report", icon: HeartPulse }, { key: "settings" as const, label: "Settings", icon: Settings }].map(({ key, label, icon: Icon }) => <button key={key} role="menuitem" type="button" onClick={() => { setActiveView(key); setMoreOpen(false); }} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-zinc-700 hover:bg-zinc-100"><Icon className="h-4 w-4" />{label}</button>)}
+        {[{ key: "history" as const, label: "History", icon: FileText }, { key: "report" as const, label: "Health report", icon: HeartPulse }, { key: "settings" as const, label: "Settings", icon: Settings }].map(({ key, label, icon: Icon }) => <button key={key} role="menuitem" type="button" onClick={() => { setActiveView(key); setMoreOpen(false); }} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-zinc-700 hover:bg-zinc-100"><Icon className="h-4 w-4" />{label}</button>)}
       </div>}
     </div>
   );
