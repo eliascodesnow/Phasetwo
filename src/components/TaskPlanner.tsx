@@ -99,26 +99,28 @@ export function TaskPlanner({
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addTask()}
           placeholder="Add a task…"
-            aria-label="New task"
-            className="min-h-11 flex-1 rounded-lg border border-zinc-200 px-3.5 text-sm placeholder:text-zinc-400 transition-colors focus:border-sage"
+          className="min-h-11 flex-1 rounded-lg border border-zinc-200 px-3.5 py-2.5 text-base placeholder:text-zinc-400 transition-colors focus:border-sage sm:text-sm"
         />
         <button
           type="button"
           onClick={addTask}
-            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-slate px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+          className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-slate px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
         >
           <Plus className="w-4 h-4" strokeWidth={2} />
           Add
         </button>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5">
+      <div className="mt-3">
+        <p className="mb-1.5 text-[11px] text-zinc-500">Best phase for this task</p>
+        <div className="flex flex-wrap gap-1.5">
         {PHASES.map((p) => (
           <button
             key={p.key}
             type="button"
             onClick={() => togglePhaseFilter(p.key)}
-            className={`min-h-11 rounded-full border px-3 text-sm font-medium transition-colors ${
+            aria-pressed={selectedPhases.includes(p.key)}
+            className={`min-h-8 text-[11px] font-medium px-3 py-1 rounded-full border transition-colors ${
               selectedPhases.includes(p.key)
                 ? PHASE_BADGE[p.key] + " border-transparent"
                 : "border-zinc-200 text-zinc-500 hover:border-zinc-300"
@@ -127,21 +129,22 @@ export function TaskPlanner({
             {p.label}
           </button>
         ))}
+        </div>
       </div>
 
       <ul className="mt-6 divide-y divide-zinc-100">
         {visibleTasks.length === 0 && (
           <li className="py-6 text-sm text-zinc-400 text-center">
-            No tasks yet. Add one above to see it sorted by phase.
+            No tasks yet. Add one above and it will be sorted for your current phase.
           </li>
         )}
         {visibleTasks.map((t) => (
-          <li key={t.id} className="flex items-center gap-3 py-3 group">
+          <li key={t.id} className="group flex items-center gap-3 py-2.5">
             <button
               type="button"
               onClick={() => cycleStatus(t.id)}
               aria-label={`Mark ${t.title} as ${STATUS_CYCLE[t.status]}`}
-              className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                 t.status === "done"
                   ? "bg-sage border-sage"
                   : t.status === "in_progress"
@@ -151,13 +154,22 @@ export function TaskPlanner({
             >
               {STATUS_ICON[t.status]}
             </button>
-            <span
-              className={`flex-1 text-sm ${
-                t.status === "done" ? "line-through text-zinc-400" : "text-zinc-800"
-              }`}
-            >
-              {t.title}
-            </span>
+            <div className="min-w-0 flex-1">
+              <span
+                className={`block text-sm ${
+                  t.status === "done" ? "line-through text-zinc-400" : "text-zinc-800"
+                }`}
+              >
+                {t.title}
+              </span>
+              <div className="mt-1 flex flex-wrap gap-1 sm:hidden">
+                {t.recommendedPhases.map((p) => (
+                  <span key={p} className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${PHASE_BADGE[p]}`}>
+                    {PHASES.find((ph) => ph.key === p)?.label}
+                  </span>
+                ))}
+              </div>
+            </div>
             <div className="hidden sm:flex gap-1">
               {t.recommendedPhases.map((p) => (
                 <span
@@ -172,7 +184,7 @@ export function TaskPlanner({
               type="button"
               onClick={() => removeTask(t.id)}
               aria-label={`Delete ${t.title}`}
-              className="flex h-11 w-11 items-center justify-center rounded-md text-zinc-400 transition-opacity hover:bg-zinc-100 hover:text-zinc-700 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+              className="flex h-9 w-9 flex-none items-center justify-center rounded-md text-zinc-400 transition-opacity hover:bg-zinc-100 hover:text-zinc-700 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
             >
               <Trash2 className="h-4 w-4" strokeWidth={1.75} />
             </button>

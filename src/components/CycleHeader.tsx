@@ -38,6 +38,10 @@ export function CycleHeader({
   const progress = cycleProgressPercent(profile);
   const nextPeriod = nextPeriodEstimate(profile);
   const tone = PHASE_TONE[phase.key];
+  const daysUntilNext = (() => {
+    const diff = Math.round((new Date(nextPeriod.getFullYear(), nextPeriod.getMonth(), nextPeriod.getDate()).getTime() - new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime()) / 86400000);
+    return diff >= 0 ? diff : null;
+  })();
   const label = ownerLabelOverride ?? profile.ownerLabel;
   const hasRecordedStarts = Boolean(profile.periodStartDates?.length);
   const phaseSegments = getPhaseSegments(profile.cycleLength);
@@ -48,10 +52,18 @@ export function CycleHeader({
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-card sm:p-7">
       <div className="grid gap-6 sm:grid-cols-[1fr_auto] sm:items-start">
         <div>
-          <p className="text-sm font-medium text-zinc-500">{cycleLabel}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <h2 className="font-display text-3xl font-bold leading-tight text-zinc-900">{hasRecordedStarts ? `Day ${day}` : "Cycle setup"}</h2>
-            {hasRecordedStarts && <span className={`inline-flex min-h-8 items-center rounded-full px-3 text-sm font-semibold ${tone.bg} ${tone.text}`}>{phase.label}</span>}
+          <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
+            {label}'s cycle
+          </p>
+          <div className="flex items-baseline gap-3 mt-1">
+            <h2 className="font-display text-3xl font-semibold text-zinc-900">
+              Day {day}
+            </h2>
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${tone.bg} ${tone.text}`}
+            >
+              {phase.label}
+            </span>
           </div>
         </div>
         <div className="sm:text-right">
@@ -59,7 +71,7 @@ export function CycleHeader({
           <p className="mt-1 font-display text-xl font-semibold text-zinc-900 tabular">
             {hasRecordedStarts ? nextPeriod.toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Not available"}
           </p>
-          {!hasRecordedStarts && <p className="mt-1 text-sm text-zinc-500">Limited history</p>}
+          {daysUntilNext !== null && <p className="text-[11px] text-zinc-500 tabular">{daysUntilNext === 0 ? "today" : daysUntilNext === 1 ? "tomorrow" : `in ${daysUntilNext} days`}</p>}
         </div>
       </div>
 
@@ -71,16 +83,29 @@ export function CycleHeader({
           <span className="absolute -top-1 h-5 w-0.5 -translate-x-1/2 rounded bg-zinc-900" style={{ left: `${markerPosition}%` }} />
           <span className="absolute -top-1 h-5 w-2 -translate-x-1/2 rounded-full border-2 border-white bg-zinc-900" style={{ left: `${markerPosition}%` }} />
         </div>
-        <div className="mt-3 grid grid-cols-4 gap-2">
-          {PHASES.map((item) => <span key={item.key} className={`text-xs leading-5 ${item.key === phase.key ? "font-semibold text-zinc-900" : "text-zinc-500"}`}>{item.label}</span>)}
+        <div className="flex justify-between text-[11px] text-zinc-500 mt-1.5 tabular">
+          <span>Day 1</span>
+          <span>{progress}% through cycle</span>
+          <span>Day {profile.cycleLength}</span>
         </div>
-      </div> : <div className="mt-7 border-y border-zinc-200 py-5 text-sm text-zinc-600">Add your most recent period start in Settings to build a phase timeline and date estimate.</div>}
-
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200 pt-4 text-sm">
-        {hasRecordedStarts && <p className="text-zinc-600">Phase-based patterns are a loose reference; many people experience cycles differently. Adjust to how you feel.</p>}
-        {hasRecordedStarts && <p className="shrink-0 text-zinc-500 tabular">{progress}% estimated</p>}
       </div>
-      {hasRecordedStarts && <p className="mt-2 text-sm text-zinc-500">{profile.periodStartDates?.length} period starts recorded. Estimates use up to six recorded intervals.</p>}
+
+      <div className="mt-5">
+        <EnergyCurve cycleLength={profile.cycleLength} day={day} />
+        <p className="text-[11px] text-zinc-500 mt-1">Relative energy across the cycle · today marked</p>
+      </div>
+
+      <p className="mt-5 text-sm leading-relaxed text-zinc-600 border-t border-zinc-100 pt-4">
+        {phase.summary}
+      </p>
+
+      {profile.periodStartDates && profile.periodStartDates.length > 0 && (
+        <details className="mt-3 text-xs leading-relaxed text-zinc-500">
+          <summary className="inline-flex min-h-9 cursor-pointer items-center text-zinc-600 hover:text-zinc-900">{profile.periodStartDates.length} period starts recorded</summary>
+          <p>Cycle length uses the average of up to six recorded intervals.</p>
+          <p className="mt-1">Recent starts: {profile.periodStartDates.slice(-6).reverse().join(", ")}</p>
+        </details>
+      )}
     </section>
   );
 }

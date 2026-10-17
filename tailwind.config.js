@@ -32,9 +32,10 @@ export default {
           950: "var(--zinc-950)",
         },
         sage: {
-          DEFAULT: "var(--accent)",
-          dark: "var(--accent-strong)",
-          light: "var(--accent-soft)",
+          DEFAULT: "#4A6B5D",
+          dark: "#37524A",
+          darker: "#2B4239",
+          light: "#E7EDE9",
         },
         slate: {
           DEFAULT: "var(--color-ink)",

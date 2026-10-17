@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { CalendarDays, FileText, HeartPulse, Home, LogOut, Leaf, ListTodo, LogIn, Settings, ShieldCheck, Sun, Moon, MoreHorizontal, UsersRound } from "lucide-react";
+import { CalendarDays, Cloud, FileText, HeartPulse, Home, LogOut, Leaf, LogIn, Settings, ShieldCheck } from "lucide-react";
 import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
 import { defaultCycleProfile, defaultSettings } from "./lib/storage";
 import { CycleHeader } from "./components/CycleHeader";
@@ -36,7 +36,12 @@ const WORKSPACE_TABS: Array<{ key: WorkspaceView; label: string; icon: typeof Ho
 ];
 
 export default function App() {
-  return <AuthGate>{(user, weeklyLoginStreak) => <WorkspaceApp key={user?.id ?? LOCAL_GUEST_ID} userId={user?.id ?? LOCAL_GUEST_ID} isAuthenticated={Boolean(user)} weeklyLoginStreak={weeklyLoginStreak} />}</AuthGate>;
+  return (
+    <>
+      <AuthGate>{(user, weeklyLoginStreak) => <WorkspaceApp key={user?.id ?? LOCAL_GUEST_ID} userId={user?.id ?? LOCAL_GUEST_ID} isAuthenticated={Boolean(user)} weeklyLoginStreak={weeklyLoginStreak} />}</AuthGate>
+      <Analytics />
+    </>
+  );
 }
 
 function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: string; isAuthenticated: boolean; weeklyLoginStreak: number }) {
@@ -277,47 +282,42 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const displayedProfile = showLdr && sharedCycleProfile ? sharedCycleProfile : profile;
 
   if (!appReady) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-zinc-500">Loading your workspace...</div>;
+    return <div role="status" className="flex min-h-screen flex-col items-center justify-center gap-3 text-sm text-zinc-500"><Leaf className="h-6 w-6 animate-pulse text-sage" strokeWidth={1.5} />Loading your workspace…</div>;
   }
 
   return (
-    <div className="min-h-screen bg-base text-zinc-800 lg:pl-64">
-      {activeView !== "login" && <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-zinc-200 bg-white px-5 py-7 lg:flex">
-        <div className="flex items-center gap-3 px-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sage-light text-sage-dark"><Leaf className="h-5 w-5" strokeWidth={1.8} /></span>
-          <span><span className="block font-display text-lg font-bold text-zinc-900">PhaseTwo</span><span className="block text-xs text-zinc-500">Cycle care, your way</span></span>
-        </div>
-        <nav aria-label="Main navigation" className="mt-10 space-y-1">
-          {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
-            <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { setMoreOpen(false); if (key === "today") setEditingLogDate(undefined); setActiveView(key); }} className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"}`}>
-              <Icon className="h-5 w-5" strokeWidth={1.8} />{label}
-            </button>
-          ))}
-          <button type="button" onClick={() => { setActiveView("report"); setMoreOpen(false); }} className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors ${activeView === "report" ? "bg-sage-light text-sage-dark" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"}`}>
-            <HeartPulse className="h-5 w-5" strokeWidth={1.8} />Health report
-          </button>
-        </nav>
-        <div className="mt-auto border-t border-zinc-200 pt-4">
-          <button type="button" onClick={() => setSettings((current) => ({ ...current, themeMode: resolvedTheme === "dark" ? "light" : "dark" }))} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm text-zinc-600 hover:bg-zinc-100" aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}>
-            {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}{resolvedTheme === "dark" ? "Light appearance" : "Dark appearance"}
-          </button>
-          {!isAuthenticated && supabase ? <button type="button" onClick={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-sage-dark hover:bg-sage-light"><LogIn className="h-4 w-4" />Sign in</button> : isAuthenticated && <button type="button" onClick={() => void signOut()} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm text-zinc-500 hover:bg-zinc-100"><LogOut className="h-4 w-4" />Sign out</button>}
-        </div>
-      </aside>}
-
-      {activeView !== "login" && <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-saturate-150 lg:hidden">
-        <div className="flex min-h-14 items-center justify-between px-4">
-          <div className="flex items-center gap-2"><Leaf className="h-5 w-5 text-sage" strokeWidth={1.8} /><span className="font-display text-base font-bold text-zinc-900">PhaseTwo</span></div>
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={() => setSettings((current) => ({ ...current, themeMode: resolvedTheme === "dark" ? "light" : "dark" }))} className="flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100" aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}>{resolvedTheme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}</button>
-            {!isAuthenticated && supabase && <button type="button" onClick={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} aria-label="Sign in" className="flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100"><LogIn className="h-5 w-5" /></button>}
+    <div className="min-h-screen bg-base">
+      <header className="border-b border-zinc-200 bg-white/80 backdrop-saturate-150 sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-8">
+          <div className="flex items-center gap-2 py-1">
+            <Leaf className="w-4.5 h-4.5 text-sage" strokeWidth={1.75} />
+            <span className="font-display text-base font-semibold tracking-tight text-zinc-900">
+              PhaseTwo
+            </span>
           </div>
+          {activeView !== "login" && <nav aria-label="Main navigation" className="order-3 flex w-full items-center gap-1 overflow-x-auto sm:order-2 sm:w-auto">
+            {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
+              <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "home") setEditingLogDate(undefined); setActiveView(key); }} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
+                <Icon className="h-4 w-4" strokeWidth={1.8} />{label}
+              </button>
+            ))}
+          </nav>}
+          {!isAuthenticated && supabase && activeView === "login" ? <button type="button" onClick={() => setActiveView("home")} className="order-2 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100"><LogIn className="h-4 w-4 rotate-180" />Back to tracker</button> : !isAuthenticated && supabase ? <button type="button" onClick={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} aria-label="Sign in to your account" title="Sign in to your account" className="order-2 inline-flex items-center gap-2 rounded-full border border-sage bg-sage-light px-3 py-2 text-xs font-semibold text-sage-dark transition-colors hover:bg-sage/10 sm:order-3"><LogIn className="h-3.5 w-3.5" />Sign in</button> : isAuthenticated && <button
+            type="button"
+            onClick={() => void signOut()}
+            aria-label="Sign out"
+            title="Sign out"
+            className="order-2 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 sm:order-3"
+          >
+            <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
+            Sign out
+          </button>}
         </div>
       </header>}
 
       {activeView === "login" && !isAuthenticated && supabase && <div className="flex min-h-14 items-center justify-between border-b border-zinc-200 px-4"><span className="font-display font-bold text-zinc-900">PhaseTwo</span><button type="button" onClick={() => setActiveView("today")} className="inline-flex min-h-11 items-center gap-2 text-sm text-zinc-600"><LogIn className="h-4 w-4 rotate-180" />Back to tracker</button></div>}
 
-      <main className="mx-auto max-w-[1440px] space-y-7 px-4 py-6 pb-28 sm:px-7 sm:py-8 lg:px-10 lg:pb-10">
+      <main className="max-w-6xl mx-auto space-y-7 px-4 py-6 pb-24 sm:px-8 sm:py-8">
         {!isAuthenticated && supabase && activeView === "login" && <section className="mx-auto max-w-lg rounded-[28px] border border-zinc-200 bg-white p-6 shadow-card sm:p-8">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sage-light text-sage-dark">
@@ -330,12 +330,20 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           </div>
           <p className="mt-4 text-sm leading-6 text-zinc-600">Use your account to sync cycle data across devices and keep your weekly streak going.</p>
           <div className="mt-5 space-y-3">
-            <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-60"><svg aria-hidden="true" viewBox="0 0 48 48" className="h-4 w-4"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.2l5.7-5.7C34.9 3.8 29.9 1.5 24 1.5 12.4 1.5 3 10.9 3 22.5S12.4 43.5 24 43.5c11.1 0 20.5-8.1 20.5-20.5 0-1.4-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.5 14.6l6.9 5.1C15.4 16 19.3 13.5 24 13.5c3.1 0 5.9 1.2 8 3.2l5.7-5.7C34.9 3.8 29.9 1.5 24 1.5c-7.2 0-13.5 3.9-17 9.6z"/><path fill="#4CAF50" d="M24 43.5c5.7 0 10.6-1.9 14.1-5.2l-6.5-5.5c-2 1.4-4.6 2.2-7.6 2.2-5.3 0-9.7-3.4-11.3-8l-6.7 5.1C6.1 38.7 14.1 43.5 24 43.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1 2.9-3.6 5.1-6.9 6l6.5 5.5c3.9-3.6 6.6-8.9 6.6-15.5 0-1.4-.1-2.7-.4-4z"/></svg>Continue with Google</button>
+            <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">
+              <Cloud className="h-4 w-4" strokeWidth={2} />
+              Continue with Google
+            </button>
             <form className="space-y-3" onSubmit={(event) => void handleEmailSignIn(event)}>
-              <label className="block text-sm font-medium text-zinc-700">Email<input name="email" type="email" autoComplete="email" required className="mt-1.5 min-h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none transition focus:border-sage" /></label>
+              <label className="block text-sm font-medium text-zinc-700">Email
+                <input name="email" type="email" autoComplete="email" required className="mt-1.5 min-h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-sage-dark focus:ring-2 focus:ring-sage/20" />
+              </label>
               {loginError && <p role="alert" className="text-sm text-rose-700">{loginError}</p>}
               {loginMessage && <p role="status" className="text-sm text-sage-dark">{loginMessage}</p>}
-              <button type="submit" disabled={loginBusy} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-sage-dark px-4 text-sm font-medium text-white transition hover:bg-sage disabled:opacity-60">{loginBusy ? "Sending link..." : "Send a sign-in link"}</button>
+              <button type="submit" disabled={loginBusy} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-sage-dark px-4 text-sm font-medium text-white transition-colors hover:bg-sage-darker disabled:cursor-not-allowed disabled:opacity-60">
+                <LogIn className="h-4 w-4" strokeWidth={2} />
+                Send magic link
+              </button>
             </form>
           </div>
         </section>}
@@ -347,12 +355,16 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           </div>
           <CycleHeader profile={displayedProfile} />
           {settings.role === "self" && isAuthenticated && <WeeklyStreakCard weeks={weeklyLoginStreak} />}
-          {settings.role === "self" && <div id="symptom-check-in" tabIndex={-1} className="scroll-mt-24 outline-none">
-            <SymptomLogger profile={profile} userId={userId} initialLogDate={editingLogDate} onHistoryChange={setSymptomLogs} saveActionRef={symptomSaveAction} />
+          {settings.role === "self" && <div className="mx-auto flex justify-center">
+            <button type="button" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#b96070] px-7 py-3 text-sm font-semibold text-white shadow-card transition-colors hover:bg-[#a95263]">
+              <HeartPulse className="h-4 w-4" />Record period
+            </button>
           </div>}
-          <div className="grid gap-4 border-y border-zinc-200 py-5 sm:grid-cols-2">
-            <button type="button" onClick={() => setActiveView("calendar")} className="flex min-h-16 items-center justify-between gap-4 text-left hover:text-sage-dark"><span><span className="block font-display text-base font-semibold text-zinc-900">Cycle calendar</span><span className="mt-1 block text-sm text-zinc-500">Review recorded dates and estimates</span></span><CalendarDays className="h-5 w-5 flex-none text-sage" /></button>
-            <button type="button" onClick={() => setActiveView("planner")} className="flex min-h-16 items-center justify-between gap-4 border-t border-zinc-200 pt-4 text-left hover:text-sage-dark sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0"><span><span className="block font-display text-base font-semibold text-zinc-900">Your planner</span><span className="mt-1 block text-sm text-zinc-500">Keep plans flexible around how you feel</span></span><ListTodo className="h-5 w-5 flex-none text-sage" /></button>
+          <PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} />
+          {settings.role === "self" && <SymptomLogger profile={profile} userId={userId} initialLogDate={editingLogDate} onHistoryChange={setSymptomLogs} saveActionRef={symptomSaveAction} />}
+          <div className="grid grid-cols-1 gap-6 items-start lg:grid-cols-2">
+            <TaskPlanner profile={displayedProfile} tasks={tasks} onChange={setTasks} />
+            {showLdr && <LDRModule profile={displayedProfile} selfTimezone={SELF_TIMEZONE} />}
           </div>
           {showLdr && <LDRModule profile={displayedProfile} selfTimezone={SELF_TIMEZONE} />}
           {settings.role === "self" && <EndometriosisAwareness logs={symptomLogs} profile={profile} />}
@@ -370,10 +382,23 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
       </main>
 
-      <footer className="mx-auto max-w-[1440px] px-6 py-5 pb-28 text-xs text-zinc-400 lg:pb-6 lg:pl-10">
+      <footer className="max-w-6xl mx-auto px-6 sm:px-10 py-8 text-xs text-zinc-400">
         {isAuthenticated ? "Your cycle, plans, and symptom history stay in your account." : "Your cycle, plans, and symptom history stay on this device."} Partner sync is invitation-only; Bella conversations stay in this session.
         {syncError && <span role="status" className="ml-2 text-red-700">Sync issue: {syncError}</span>}
       </footer>
+
+      {activeView !== "login" && <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 backdrop-blur sm:hidden">
+        <ul className="pb-safe mx-auto grid max-w-md grid-cols-4">
+          {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
+            <li key={key}>
+              <button type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "home") setEditingLogDate(undefined); setActiveView(key); window.scrollTo({ top: 0 }); }} className={`flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${activeView === key ? "text-sage-dark" : "text-zinc-500"}`}>
+                <span className={`flex h-7 w-12 items-center justify-center rounded-full transition-colors ${activeView === key ? "bg-sage-light" : ""}`}><Icon className="h-5 w-5" strokeWidth={1.8} /></span>
+                {label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>}
 
       {settings.role === "self" && <AskBellaLauncher />}
       {showLdr && <PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} />}
