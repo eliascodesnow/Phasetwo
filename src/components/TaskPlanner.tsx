@@ -43,7 +43,8 @@ export function TaskPlanner({
 }) {
   const [title, setTitle] = useState("");
   const [selectedPhases, setSelectedPhases] = useState<Phase[]>(["follicular"]);
-  const [optimize, setOptimize] = useState(true);
+  const [optimize, setOptimize] = useState(Boolean(profile.periodStartDates?.length));
+  const hasRecordedStarts = Boolean(profile.periodStartDates?.length);
 
   const day = currentCycleDay(profile);
   const phase = phaseForDay(day, profile.cycleLength).key;
@@ -79,16 +80,18 @@ export function TaskPlanner({
         <button
           type="button"
           onClick={() => setOptimize((v) => !v)}
-          className={`inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+          disabled={!hasRecordedStarts}
+          className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
             optimize
               ? "bg-sage text-white border-sage"
               : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300"
           }`}
         >
           <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={2} />
-          Optimize for biological energy
+          Sort by cycle phase
         </button>
       </div>
+      {!hasRecordedStarts && <p className="mt-3 text-sm text-zinc-500">Add a period start in Settings before sorting tasks by cycle phase.</p>}
 
       <div className="mt-5 flex flex-col sm:flex-row gap-2">
         <input
@@ -96,12 +99,13 @@ export function TaskPlanner({
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addTask()}
           placeholder="Add a task…"
-          className="flex-1 border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm placeholder:text-zinc-400 focus:border-sage transition-colors"
+            aria-label="New task"
+            className="min-h-11 flex-1 rounded-lg border border-zinc-200 px-3.5 text-sm placeholder:text-zinc-400 transition-colors focus:border-sage"
         />
         <button
           type="button"
           onClick={addTask}
-          className="inline-flex items-center justify-center gap-1.5 bg-slate text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-zinc-800 transition-colors"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-slate px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
         >
           <Plus className="w-4 h-4" strokeWidth={2} />
           Add
@@ -114,7 +118,7 @@ export function TaskPlanner({
             key={p.key}
             type="button"
             onClick={() => togglePhaseFilter(p.key)}
-            className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${
+            className={`min-h-11 rounded-full border px-3 text-sm font-medium transition-colors ${
               selectedPhases.includes(p.key)
                 ? PHASE_BADGE[p.key] + " border-transparent"
                 : "border-zinc-200 text-zinc-500 hover:border-zinc-300"
@@ -137,7 +141,7 @@ export function TaskPlanner({
               type="button"
               onClick={() => cycleStatus(t.id)}
               aria-label={`Mark ${t.title} as ${STATUS_CYCLE[t.status]}`}
-              className={`flex-shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-colors ${
+              className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                 t.status === "done"
                   ? "bg-sage border-sage"
                   : t.status === "in_progress"
@@ -168,9 +172,9 @@ export function TaskPlanner({
               type="button"
               onClick={() => removeTask(t.id)}
               aria-label={`Delete ${t.title}`}
-              className="opacity-0 group-hover:opacity-100 text-zinc-300 hover:text-zinc-500 transition-opacity"
+              className="flex h-11 w-11 items-center justify-center rounded-md text-zinc-400 transition-opacity hover:bg-zinc-100 hover:text-zinc-700 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
             >
-              <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />
+              <Trash2 className="h-4 w-4" strokeWidth={1.75} />
             </button>
           </li>
         ))}

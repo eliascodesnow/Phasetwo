@@ -1,6 +1,7 @@
 export type Phase = "menstrual" | "follicular" | "ovulatory" | "luteal";
 
 export type UserRole = "self" | "partner";
+export type ThemeMode = "system" | "light" | "dark";
 
 export interface CycleProfile {
   /** ISO date (yyyy-mm-dd) of the most recent period start */
@@ -49,4 +50,8 @@ export interface PhaseInfo {
 export interface AppSettings {
   role: UserRole;
   ldrEnabled: boolean;
+  themeMode: ThemeMode;
+  displayName?: string;
+  age?: number;
+  personalDetailsPromptSeen?: boolean;
 }

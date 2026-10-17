@@ -25,6 +25,14 @@ export async function loadSyncedAppState(userId: string): Promise<UserAppState> 
     appSettings: {
       role: data.app_settings?.role === "partner" ? "partner" : defaultSettings.role,
       ldrEnabled: Boolean(data.app_settings?.ldrEnabled),
+      themeMode: data.app_settings?.themeMode === "light" || data.app_settings?.themeMode === "dark"
+        ? data.app_settings.themeMode
+        : defaultSettings.themeMode,
+      displayName: typeof data.app_settings?.displayName === "string" ? data.app_settings.displayName.trim().slice(0, 80) || undefined : undefined,
+      age: Number.isInteger(data.app_settings?.age) && Number(data.app_settings.age) >= 1 && Number(data.app_settings.age) <= 120
+        ? Number(data.app_settings.age)
+        : undefined,
+      personalDetailsPromptSeen: Boolean(data.app_settings?.personalDetailsPromptSeen),
     },
     chatMessages: data.chat_messages ?? [],
   };

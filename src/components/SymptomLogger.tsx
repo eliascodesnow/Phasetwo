@@ -4,12 +4,15 @@ import { buildEmptySymptomLog, buildSymptomLogMeta, deleteAllSymptomLogs, fetchL
 import type { CycleProfile } from "../types";
 import { currentCycleDay, phaseForDay } from "../lib/cycleUtils";
 
-const PAIN_ANCHORS = [
-  { value: 0, label: "none" },
-  { value: 5, label: "distracting" },
-  { value: 8, label: "can't ignore it" },
-  { value: 10, label: "worst" },
-] as const;
+const COMMON_SYMPTOMS: Symptom[] = ["cramps", "fatigue", "headache", "bloating"];
+
+function painLevelLabel(score: number): string {
+  if (score === 0) return "none";
+  if (score <= 2) return "mild";
+  if (score <= 5) return "moderate";
+  if (score <= 9) return "severe";
+  return "worst";
+}
 
 const PHASE_BADGE: Record<string, string> = {
   menstrual: "bg-phase-menstrual-bg text-phase-menstrual-text",
@@ -69,6 +72,8 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
+  const [savedMessage, setSavedMessage] = useState("");
+  const [showMoreSymptoms, setShowMoreSymptoms] = useState(false);
   const [consentGranted, setConsentGranted] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
   const saveHandlerRef = useRef<() => Promise<boolean>>(async () => true);
@@ -119,6 +124,7 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
 
   function updateLog<K extends keyof SymptomLog>(key: K, value: SymptomLog[K]) {
     setDirty(true);
+    setSavedMessage("");
     setLog((current) => ({
       ...current,
       [key]: value,
@@ -127,12 +133,16 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
 
   function changeLogDate(date: string) {
     if (!date) return;
+    if (dirty && !window.confirm("Discard your unsaved check-in changes?")) return;
     setLog(normalizeLog(history.find((entry) => entry.log_date === date), profile, date));
     setDirty(false);
+    setError("");
+    setSavedMessage("");
   }
 
   function toggleMultiSelect<K extends "pain_locations" | "symptoms">(key: K, value: K extends "pain_locations" ? PainLocation : Symptom) {
     setDirty(true);
+    setSavedMessage("");
     setLog((current) => {
       const values = clampArray(current[key] as string[] | undefined) as Array<PainLocation | Symptom>;
       const next = values.includes(value as never)
@@ -187,6 +197,7 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
       });
       setLog({ ...saved, notes: saved.notes ?? "", pain_locations: clampArray(saved.pain_locations), symptoms: clampArray(saved.symptoms), bleeding: saved.bleeding ?? "none", impact: saved.impact ?? "none", impact_areas: clampArray(saved.impact_areas), outside_period: saved.outside_period ?? false });
       setDirty(false);
+      setSavedMessage("Check-in saved.");
       return true;
     } catch (saveError) {
       setHistory((prev) => {
@@ -254,6 +265,7 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
       return { key, label: formatShortDay(date), pain: entry?.pain_score ?? null };
     });
   }, [history]);
+  const showAllSymptoms = showMoreSymptoms || clampArray(log.symptoms).some((symptom) => !COMMON_SYMPTOMS.includes(symptom));
 
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 shadow-card">
@@ -263,12 +275,12 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
             <HeartPulse className="h-4 w-4" strokeWidth={2.1} />
           </div>
           <div>
-            <p className="font-display text-lg font-semibold text-zinc-900">Period & pain status</p>
-            <p className="text-xs text-zinc-500">Your daily menstrual-health check-in</p>
+            <p className="font-display text-lg font-semibold text-zinc-900">Daily check-in</p>
+            <p className="text-sm text-zinc-500">A few details about today, kept private to your account.</p>
           </div>
         </div>
-        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] ${PHASE_BADGE[phaseMeta.key]}`}>
-          {phaseMeta.label}
+        <span className={`inline-flex min-h-8 items-center rounded-full px-2.5 py-1 text-xs font-medium ${profile.periodStartDates?.length ? PHASE_BADGE[phaseMeta.key] : "bg-zinc-100 text-zinc-600"}`}>
+          {profile.periodStartDates?.length ? phaseMeta.label : "Cycle phase unavailable"}
         </span>
       </div>
 
@@ -283,12 +295,12 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
               <div className="mb-2 flex items-center justify-between gap-2 text-sm font-medium text-zinc-700">
                 <label className="flex items-center gap-2"><CalendarRange className="h-4 w-4 text-sage" strokeWidth={2.1} /><span className="sr-only">Log date</span><input type="date" value={log.log_date} max={todayKey} onChange={(event) => changeLogDate(event.target.value)} className="rounded border border-zinc-200 bg-white px-2 py-1 text-sm font-medium text-zinc-700" /></label>
-                <span className="tabular text-zinc-500">Day {log.cycle_day || currentCycleDay(profile, new Date())}</span>
+                <span className="tabular text-zinc-500">{profile.periodStartDates?.length ? `Day ${log.cycle_day || currentCycleDay(profile, new Date())}` : "Cycle day unavailable"}</span>
               </div>
 
               <label htmlFor="pain-score" className="flex items-center justify-between text-sm text-zinc-700">
-                <span>Pain</span>
-                <span className="tabular font-semibold text-zinc-900">{log.pain_score}/10</span>
+                <span>Pain level</span>
+                <span className="tabular font-semibold text-zinc-900">{painLevelLabel(log.pain_score)} · {log.pain_score}/10</span>
               </label>
               <input
                 id="pain-score"
@@ -298,21 +310,16 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
                 step={1}
                 value={log.pain_score}
                 onChange={(event) => updateLog("pain_score", Number(event.target.value))}
-                className="mt-3 h-2 w-full accent-[#4A6B5D]"
+                className="mt-3 h-3 w-full accent-sage"
                 aria-label="Pain score from 0 to 10"
               />
-              <div className="mt-2 grid grid-cols-4 gap-1 text-[10px] text-zinc-500">
-                {PAIN_ANCHORS.map((mark) => (
-                  <div key={mark.value} className="text-left">
-                    <span className="tabular font-medium text-zinc-700">{mark.value}</span>
-                    <span className="ml-1 text-zinc-500">{mark.label}</span>
-                  </div>
-                ))}
+              <div className="mt-2 flex justify-between gap-2 text-xs text-zinc-500">
+                {["none", "mild", "moderate", "severe", "worst"].map((label) => <span key={label}>{label}</span>)}
               </div>
             </div>
 
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-zinc-700">Where did it hurt?</p>
+            <details className="border-y border-zinc-200 py-3">
+              <summary className="min-h-11 cursor-pointer content-center text-sm font-medium text-zinc-700">Pain locations <span className="font-normal text-zinc-500">(optional)</span></summary>
               <div className="flex flex-wrap gap-2">
                 {PAIN_LOCATION_OPTIONS.map((option) => {
                   const selected = isSelected(log.pain_locations, option);
@@ -322,19 +329,19 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
                       type="button"
                       aria-pressed={selected}
                       onClick={() => toggleMultiSelect("pain_locations", option)}
-                      className={`min-h-[42px] rounded-full border px-3 py-2 text-sm transition-colors ${selected ? "border-sage bg-sage-light text-sage-dark" : "border-zinc-200 bg-white text-zinc-600"}`}
+                      className={`min-h-11 rounded-full border px-3 py-2 text-sm transition-colors ${selected ? "border-sage bg-sage-light text-sage-dark" : "border-zinc-200 bg-white text-zinc-600"}`}
                     >
                       {PAIN_LOCATION_LABELS[option]}
                     </button>
                   );
                 })}
               </div>
-            </div>
+            </details>
 
             <div className="space-y-3">
-              <p className="text-sm font-medium text-zinc-700">What other symptoms showed up?</p>
+              <p className="text-sm font-medium text-zinc-700">What symptoms showed up?</p>
               <div className="flex flex-wrap gap-2">
-                {SYMPTOM_OPTIONS.map((option) => {
+                {SYMPTOM_OPTIONS.filter((option) => COMMON_SYMPTOMS.includes(option) || showAllSymptoms).map((option) => {
                   const selected = isSelected(log.symptoms, option);
                   return (
                     <button
@@ -342,12 +349,13 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
                       type="button"
                       aria-pressed={selected}
                       onClick={() => toggleMultiSelect("symptoms", option)}
-                      className={`min-h-[42px] rounded-full border px-3 py-2 text-sm transition-colors ${selected ? "border-sage bg-sage-light text-sage-dark" : "border-zinc-200 bg-white text-zinc-600"}`}
+                      className={`min-h-11 rounded-full border px-3 py-2 text-sm transition-colors ${selected ? "border-sage bg-sage-light text-sage-dark" : "border-zinc-200 bg-white text-zinc-600"}`}
                     >
                       {SYMPTOM_LABELS[option]}
                     </button>
                   );
                 })}
+                <button type="button" aria-expanded={showAllSymptoms} onClick={() => setShowMoreSymptoms((value) => !value)} className="min-h-11 rounded-full border border-dashed border-zinc-300 px-4 text-sm font-medium text-zinc-600 hover:border-sage hover:text-sage-dark">{showAllSymptoms ? "Fewer" : "More symptoms"}</button>
               </div>
             </div>
 
@@ -360,7 +368,7 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
                     type="button"
                     aria-pressed={log.bleeding === option}
                     onClick={() => updateLog("bleeding", option)}
-                    className={`min-h-[42px] rounded-full border px-3 py-2 text-sm ${log.bleeding === option ? "border-sage bg-sage-light text-sage-dark" : "border-zinc-200 bg-white text-zinc-600"}`}
+                    className={`min-h-11 rounded-full border px-3 py-2 text-sm ${log.bleeding === option ? "border-sage bg-sage-light text-sage-dark" : "border-zinc-200 bg-white text-zinc-600"}`}
                   >
                     {BLEEDING_LABELS[option]}
                   </button>
@@ -368,38 +376,46 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
               </div>
             </div>
 
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-zinc-700">Did it get in the way of your day?</p>
+            <details className="border-y border-zinc-200 py-3">
+              <summary className="min-h-11 cursor-pointer content-center text-sm font-medium text-zinc-700">Daily impact and notes <span className="font-normal text-zinc-500">(optional)</span></summary>
+              <div className="mt-4 space-y-5">
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-zinc-700">Did it get in the way of your day?</p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {IMPACT_OPTIONS.map((option) => (
                   <button
                     key={option}
                     type="button"
                     aria-pressed={log.impact === option}
-                    className={`min-h-[48px] rounded-xl border px-3 py-2 text-sm ${log.impact === option ? "border-sage bg-sage-light text-sage-dark" : "border-zinc-200 bg-white text-zinc-600"}`}
+                    className={`min-h-11 rounded-xl border px-3 py-2 text-sm ${log.impact === option ? "border-sage bg-sage-light text-sage-dark" : "border-zinc-200 bg-white text-zinc-600"}`}
                     onClick={() => updateLog("impact", option)}
                   >
                     {IMPACT_LABELS[option]}
                   </button>
                 ))}
               </div>
-            </div>
+              </div>
 
-            <div className="space-y-3">
+              <div className="space-y-3">
               <p className="text-sm font-medium text-zinc-700">What areas of life were affected? <span className="font-normal text-zinc-400">(Optional)</span></p>
               <div className="flex flex-wrap gap-2">
                 {IMPACT_AREA_OPTIONS.map((area) => {
                   const selected = clampArray(log.impact_areas).includes(area);
                   return (
-                    <button key={area} type="button" aria-pressed={selected} onClick={() => updateLog("impact_areas", selected ? clampArray(log.impact_areas).filter((item) => item !== area) : [...clampArray(log.impact_areas), area])} className={`min-h-[42px] rounded-full border px-3 py-2 text-sm ${selected ? "border-sage bg-sage-light text-sage-dark" : "border-zinc-200 bg-white text-zinc-600"}`}>
+                    <button key={area} type="button" aria-pressed={selected} onClick={() => updateLog("impact_areas", selected ? clampArray(log.impact_areas).filter((item) => item !== area) : [...clampArray(log.impact_areas), area])} className={`min-h-11 rounded-full border px-3 py-2 text-sm ${selected ? "border-sage bg-sage-light text-sage-dark" : "border-zinc-200 bg-white text-zinc-600"}`}>
                       {IMPACT_AREA_LABELS[area]}
                     </button>
                   );
                 })}
               </div>
-            </div>
+              </div>
 
-            <div className="space-y-2">
+              <label className="flex min-h-11 items-center gap-3 text-sm text-zinc-700">
+                <input type="checkbox" checked={Boolean(log.outside_period)} onChange={(event) => updateLog("outside_period", event.target.checked)} className="h-5 w-5 accent-sage" />
+                Symptoms occurred outside bleeding days
+              </label>
+
+              <div className="space-y-2">
               <label htmlFor="symptom-note" className="text-sm font-medium text-zinc-700">
                 Notes (optional)
               </label>
@@ -411,9 +427,12 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
                 className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-700 placeholder:text-zinc-400 focus:border-sage focus:outline-none"
                 placeholder="Anything that felt different today?"
               />
-            </div>
+              </div>
+              </div>
+            </details>
 
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <details className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+              <summary className="min-h-11 cursor-pointer content-center text-sm font-medium text-zinc-700">Recent pain · last 14 days</summary>
               <div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-medium uppercase tracking-[0.1em] text-zinc-500">
                 <span>Recent pain</span>
                 <span>14-day</span>
@@ -423,7 +442,7 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
                   <div key={key} className="flex flex-col items-center gap-1">
                     <div className="flex h-12 w-full items-end justify-center rounded-md bg-zinc-100 px-1 py-1">
                       <div
-                        className={`w-full rounded-sm ${pain === null ? "bg-zinc-200" : "bg-[#4A6B5D]"}`}
+                        className={`w-full rounded-sm ${pain === null ? "bg-zinc-200" : "bg-sage"}`}
                         style={{ height: pain === null ? "18%" : `${Math.max(18, pain * 9)}%` }}
                         title={pain === null ? "No entry" : `${pain}/10 pain`}
                       />
@@ -432,7 +451,7 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
                   </div>
                 ))}
               </div>
-            </div>
+            </details>
 
             {error ? (
               <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -441,15 +460,16 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
               </div>
             ) : null}
 
-            <div className="flex items-center justify-between gap-3 pt-2">
+            {savedMessage && <p role="status" className="text-sm font-medium text-sage-dark">{savedMessage}</p>}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
               <div className="flex items-center gap-2 text-xs text-zinc-500">
                 <ShieldCheck className="h-4 w-4 text-sage" strokeWidth={2.1} />
                 Private to your account; not used for advertising
               </div>
               <div className="flex flex-wrap justify-end gap-2">
                 <button type="button" onClick={() => void handleDeleteHistory()} disabled={saving || history.length === 0} className="min-h-[44px] rounded-xl border border-zinc-200 px-3 py-2.5 text-xs font-medium text-zinc-600 disabled:opacity-50">Delete symptom history</button>
-                <button type="button" onClick={handleSave} disabled={saving} className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-sage px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-70">
-                  {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : log.log_date === todayKey ? "Save today" : "Save log"}
+                <button type="button" onClick={() => void handleSave()} disabled={saving || !dirty} className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-sage px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+                  {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : "Save log"}
                 </button>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { CalendarDays, Cloud, FileText, HeartPulse, Home, LogOut, Leaf, LogIn, Settings, ShieldCheck } from "lucide-react";
+import { CalendarDays, FileText, HeartPulse, Home, LogOut, Leaf, ListTodo, LogIn, Settings, ShieldCheck, Sun, Moon, MoreHorizontal, UsersRound } from "lucide-react";
 import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
 import { defaultCycleProfile, defaultSettings } from "./lib/storage";
 import { CycleHeader } from "./components/CycleHeader";
@@ -15,19 +15,23 @@ import { PartnerAdviceLauncher } from "./components/PartnerAdviceLauncher";
 import { AskBellaLauncher } from "./components/AskBellaLauncher";
 import { AuthGate } from "./components/AuthGate";
 import { supabase } from "./lib/supabase";
-import { clearLocalUserData, LOCAL_GUEST_ID, loadLocalAppState, type UserAppState } from "./lib/storage";
+import { clearLocalUserData, LOCAL_GUEST_ID, loadLocalAppState, saveLocalAppState, type UserAppState } from "./lib/storage";
 import { loadSyncedAppState, saveSyncedAppState } from "./lib/userData";
 import { recordPeriodStart } from "./lib/cycleUtils";
 import type { SymptomLog } from "./lib/symptoms";
 import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
+import { CommunityView } from "./components/CommunityView";
 
 const SELF_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
-type WorkspaceView = "home" | "history" | "report" | "settings" | "login";
+const COMMUNITY_ENABLED = import.meta.env.VITE_COMMUNITY_ENABLED === "true";
+type WorkspaceView = "today" | "calendar" | "planner" | "community" | "history" | "report" | "settings" | "login";
 
 const WORKSPACE_TABS: Array<{ key: WorkspaceView; label: string; icon: typeof Home }> = [
-  { key: "home", label: "Home", icon: Home },
-  { key: "history", label: "History", icon: CalendarDays },
-  { key: "report", label: "Report", icon: FileText },
+  { key: "today", label: "Today", icon: Home },
+  { key: "calendar", label: "Calendar", icon: CalendarDays },
+  { key: "planner", label: "Planner", icon: ListTodo },
+  ...(COMMUNITY_ENABLED ? [{ key: "community" as const, label: "Community", icon: UsersRound }] : []),
+  { key: "history", label: "History", icon: FileText },
   { key: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -42,7 +46,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [sharedCycleProfile, setSharedCycleProfile] = useState<CycleProfile | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [symptomLogs, setSymptomLogs] = useState<SymptomLog[]>([]);
-  const [activeView, setActiveView] = useState<WorkspaceView>("home");
+  const [activeView, setActiveView] = useState<WorkspaceView>("today");
   const [editingLogDate, setEditingLogDate] = useState<string | undefined>();
   const [appReady, setAppReady] = useState(false);
   const [syncError, setSyncError] = useState("");
@@ -51,8 +55,39 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [loginBusy, setLoginBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("dark");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [focusCheckin, setFocusCheckin] = useState(false);
+  const [detailsName, setDetailsName] = useState("");
+  const [detailsAge, setDetailsAge] = useState("");
+  const [detailsError, setDetailsError] = useState("");
   const deletingAccount = useRef(false);
   const symptomSaveAction = useRef<SymptomLoggerSaveRef["current"]>(null);
+
+  useEffect(() => {
+    const mode = settings.themeMode ?? "system";
+    const media = window.matchMedia("(prefers-color-scheme: light)");
+    const applyTheme = () => {
+      const theme = mode === "system" ? (media.matches ? "light" : "dark") : mode;
+      document.documentElement.dataset.theme = theme;
+      setResolvedTheme(theme);
+    };
+    applyTheme();
+    if (mode === "system") {
+      media.addEventListener("change", applyTheme);
+      return () => media.removeEventListener("change", applyTheme);
+    }
+  }, [settings.themeMode]);
+
+  useEffect(() => {
+    if (!focusCheckin || activeView !== "today") return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("symptom-check-in")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("symptom-check-in")?.focus({ preventScroll: true });
+      setFocusCheckin(false);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeView, focusCheckin]);
 
   useEffect(() => {
     let ignore = false;
@@ -246,36 +281,43 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   }
 
   return (
-    <div className="min-h-screen bg-base">
-      <header className="border-b border-zinc-200 bg-white/80 backdrop-saturate-150 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-8">
-          <div className="flex items-center gap-2 py-1">
-            <Leaf className="w-4.5 h-4.5 text-sage" strokeWidth={1.75} />
-            <span className="font-display text-base font-semibold tracking-tight text-zinc-900">
-              PhaseTwo
-            </span>
-          </div>
-          {activeView !== "login" && <nav aria-label="Main navigation" className="order-3 flex w-full items-center gap-1 overflow-x-auto sm:order-2 sm:w-auto">
-            {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
-              <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "home") setEditingLogDate(undefined); setActiveView(key); }} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
-                <Icon className="h-4 w-4" strokeWidth={1.8} />{label}
-              </button>
-            ))}
-          </nav>}
-          {!isAuthenticated && supabase && activeView === "login" ? <button type="button" onClick={() => setActiveView("home")} className="order-2 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100"><LogIn className="h-4 w-4 rotate-180" />Back to tracker</button> : !isAuthenticated && supabase ? <button type="button" onClick={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} aria-label="Sign in to your account" title="Sign in to your account" className="order-2 inline-flex items-center gap-2 rounded-full border border-sage bg-sage-light px-3 py-2 text-xs font-semibold text-sage-dark transition-colors hover:bg-sage/10 sm:order-3"><LogIn className="h-3.5 w-3.5" />Sign in</button> : isAuthenticated && <button
-            type="button"
-            onClick={() => void signOut()}
-            aria-label="Sign out"
-            title="Sign out"
-            className="order-2 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 sm:order-3"
-          >
-            <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Sign out
-          </button>}
+    <div className="min-h-screen bg-base text-zinc-800 lg:pl-64">
+      {activeView !== "login" && <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-zinc-200 bg-white px-5 py-7 lg:flex">
+        <div className="flex items-center gap-3 px-2">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sage-light text-sage-dark"><Leaf className="h-5 w-5" strokeWidth={1.8} /></span>
+          <span><span className="block font-display text-lg font-bold text-zinc-900">PhaseTwo</span><span className="block text-xs text-zinc-500">Cycle care, your way</span></span>
         </div>
-      </header>
+        <nav aria-label="Main navigation" className="mt-10 space-y-1">
+          {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
+            <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { setMoreOpen(false); if (key === "today") setEditingLogDate(undefined); setActiveView(key); }} className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"}`}>
+              <Icon className="h-5 w-5" strokeWidth={1.8} />{label}
+            </button>
+          ))}
+          <button type="button" onClick={() => { setActiveView("report"); setMoreOpen(false); }} className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors ${activeView === "report" ? "bg-sage-light text-sage-dark" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"}`}>
+            <HeartPulse className="h-5 w-5" strokeWidth={1.8} />Health report
+          </button>
+        </nav>
+        <div className="mt-auto border-t border-zinc-200 pt-4">
+          <button type="button" onClick={() => setSettings((current) => ({ ...current, themeMode: resolvedTheme === "dark" ? "light" : "dark" }))} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm text-zinc-600 hover:bg-zinc-100" aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}>
+            {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}{resolvedTheme === "dark" ? "Light appearance" : "Dark appearance"}
+          </button>
+          {!isAuthenticated && supabase ? <button type="button" onClick={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-sage-dark hover:bg-sage-light"><LogIn className="h-4 w-4" />Sign in</button> : isAuthenticated && <button type="button" onClick={() => void signOut()} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm text-zinc-500 hover:bg-zinc-100"><LogOut className="h-4 w-4" />Sign out</button>}
+        </div>
+      </aside>}
 
-      <main className="max-w-6xl mx-auto space-y-7 px-4 py-6 pb-24 sm:px-8 sm:py-8">
+      {activeView !== "login" && <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-saturate-150 lg:hidden">
+        <div className="flex min-h-14 items-center justify-between px-4">
+          <div className="flex items-center gap-2"><Leaf className="h-5 w-5 text-sage" strokeWidth={1.8} /><span className="font-display text-base font-bold text-zinc-900">PhaseTwo</span></div>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => setSettings((current) => ({ ...current, themeMode: resolvedTheme === "dark" ? "light" : "dark" }))} className="flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100" aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}>{resolvedTheme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}</button>
+            {!isAuthenticated && supabase && <button type="button" onClick={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} aria-label="Sign in" className="flex h-11 w-11 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100"><LogIn className="h-5 w-5" /></button>}
+          </div>
+        </div>
+      </header>}
+
+      {activeView === "login" && !isAuthenticated && supabase && <div className="flex min-h-14 items-center justify-between border-b border-zinc-200 px-4"><span className="font-display font-bold text-zinc-900">PhaseTwo</span><button type="button" onClick={() => setActiveView("today")} className="inline-flex min-h-11 items-center gap-2 text-sm text-zinc-600"><LogIn className="h-4 w-4 rotate-180" />Back to tracker</button></div>}
+
+      <main className="mx-auto max-w-[1440px] space-y-7 px-4 py-6 pb-28 sm:px-7 sm:py-8 lg:px-10 lg:pb-10">
         {!isAuthenticated && supabase && activeView === "login" && <section className="mx-auto max-w-lg rounded-[28px] border border-zinc-200 bg-white p-6 shadow-card sm:p-8">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sage-light text-sage-dark">
@@ -298,36 +340,96 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           </div>
         </section>}
 
-        {activeView === "home" && <>
+        {activeView === "today" && <>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div><p className="text-sm font-medium text-sage-dark">{new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date())}</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Today</h1>{settings.displayName && <p className="mt-1 text-sm text-zinc-600">Hello, {settings.displayName}</p>}</div>
+            {settings.role === "self" && <button type="button" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-sage/40 px-4 text-sm font-semibold text-sage-dark transition-colors hover:bg-sage-light"><HeartPulse className="h-4 w-4" />Period started</button>}
+          </div>
           <CycleHeader profile={displayedProfile} />
           {settings.role === "self" && isAuthenticated && <WeeklyStreakCard weeks={weeklyLoginStreak} />}
-          {settings.role === "self" && <div className="mx-auto flex justify-center">
-            <button type="button" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#b96070] px-7 py-3 text-sm font-semibold text-white shadow-card transition-colors hover:bg-[#a95263]">
-              <HeartPulse className="h-4 w-4" />Record period
-            </button>
+          {settings.role === "self" && <div id="symptom-check-in" tabIndex={-1} className="scroll-mt-24 outline-none">
+            <SymptomLogger profile={profile} userId={userId} initialLogDate={editingLogDate} onHistoryChange={setSymptomLogs} saveActionRef={symptomSaveAction} />
           </div>}
-          <PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} />
-          {settings.role === "self" && <SymptomLogger profile={profile} userId={userId} initialLogDate={editingLogDate} onHistoryChange={setSymptomLogs} saveActionRef={symptomSaveAction} />}
-          <div className="grid grid-cols-1 gap-6 items-start lg:grid-cols-2">
-            <TaskPlanner profile={displayedProfile} tasks={tasks} onChange={setTasks} />
-            {showLdr && <LDRModule profile={displayedProfile} selfTimezone={SELF_TIMEZONE} />}
+          <div className="grid gap-4 border-y border-zinc-200 py-5 sm:grid-cols-2">
+            <button type="button" onClick={() => setActiveView("calendar")} className="flex min-h-16 items-center justify-between gap-4 text-left hover:text-sage-dark"><span><span className="block font-display text-base font-semibold text-zinc-900">Cycle calendar</span><span className="mt-1 block text-sm text-zinc-500">Review recorded dates and estimates</span></span><CalendarDays className="h-5 w-5 flex-none text-sage" /></button>
+            <button type="button" onClick={() => setActiveView("planner")} className="flex min-h-16 items-center justify-between gap-4 border-t border-zinc-200 pt-4 text-left hover:text-sage-dark sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0"><span><span className="block font-display text-base font-semibold text-zinc-900">Your planner</span><span className="mt-1 block text-sm text-zinc-500">Keep plans flexible around how you feel</span></span><ListTodo className="h-5 w-5 flex-none text-sage" /></button>
           </div>
+          {showLdr && <LDRModule profile={displayedProfile} selfTimezone={SELF_TIMEZONE} />}
+          {settings.role === "self" && <EndometriosisAwareness logs={symptomLogs} profile={profile} />}
         </>}
 
-        {activeView === "history" && <HistoryView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("home"); }} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
-        {activeView === "report" && <ReportView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} />}
+        {activeView === "calendar" && <section className="space-y-5"><div><p className="text-sm font-medium text-sage-dark">Your records, not a forecast</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Calendar</h1><p className="mt-1 text-sm text-zinc-500">Recorded period dates and symptom entries are distinct from estimates.</p></div><PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} onEditLog={(date) => { setEditingLogDate(date); setActiveView("today"); }} /></section>}
+
+        {activeView === "planner" && <section className="space-y-5"><div><p className="text-sm font-medium text-sage-dark">Plans that can flex</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Planner</h1><p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">Cycle-phase suggestions describe typical patterns, not a promise about your energy. Adjust plans to how you feel.</p></div><TaskPlanner profile={displayedProfile} tasks={tasks} onChange={setTasks} /></section>}
+
+        {COMMUNITY_ENABLED && activeView === "community" && <CommunityView isAuthenticated={isAuthenticated} onSignIn={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} />}
+
+        {activeView === "history" && <HistoryView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("today"); }} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
+        {activeView === "report" && <ReportView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} displayName={settings.displayName} age={settings.age} />}
         {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
 
-        {activeView === "home" && settings.role === "self" && <EndometriosisAwareness logs={symptomLogs} profile={profile} />}
       </main>
 
-      <footer className="max-w-6xl mx-auto px-6 sm:px-10 py-8 text-xs text-zinc-400">
+      <footer className="mx-auto max-w-[1440px] px-6 py-5 pb-28 text-xs text-zinc-400 lg:pb-6 lg:pl-10">
         {isAuthenticated ? "Your cycle, plans, and symptom history stay in your account." : "Your cycle, plans, and symptom history stay on this device."} Partner sync is invitation-only; Bella conversations stay in this session.
         {syncError && <span role="status" className="ml-2 text-red-700">Sync issue: {syncError}</span>}
       </footer>
 
       {settings.role === "self" && <AskBellaLauncher />}
       {showLdr && <PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} />}
+
+      {!isAuthenticated && !settings.personalDetailsPromptSeen && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/70 p-4 backdrop-blur-sm">
+        <section role="dialog" aria-modal="true" aria-labelledby="personal-details-title" className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl sm:p-7">
+          <p className="text-sm font-semibold text-sage-dark">Before you begin</p>
+          <h2 id="personal-details-title" className="mt-2 font-display text-2xl font-bold text-zinc-900">Make this space yours</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-600">Add a name for your private display and an age for your health report. Both are optional, and you can skip this.</p>
+          <form className="mt-5 space-y-4" onSubmit={(event) => {
+            event.preventDefault();
+            const parsedAge = detailsAge.trim() ? Number(detailsAge) : undefined;
+            if (parsedAge !== undefined && (!Number.isInteger(parsedAge) || parsedAge < 1 || parsedAge > 120)) {
+              setDetailsError("Enter an age from 1 to 120, or leave it blank.");
+              return;
+            }
+            const name = detailsName.trim().slice(0, 80);
+            const nextProfile = profile;
+            const nextSettings = { ...settings, displayName: name || undefined, age: parsedAge, personalDetailsPromptSeen: true };
+            setSettings(nextSettings);
+            saveLocalAppState(userId, { cycleProfile: nextProfile, tasks, appSettings: nextSettings, chatMessages: messages });
+            setDetailsError("");
+          }}>
+            <label className="block text-sm font-medium text-zinc-700">Name <span className="font-normal text-zinc-500">(optional)</span>
+              <input autoFocus value={detailsName} onChange={(event) => setDetailsName(event.target.value)} maxLength={80} autoComplete="given-name" className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900" placeholder="What should we call you?" />
+            </label>
+            <label className="block text-sm font-medium text-zinc-700">Age <span className="font-normal text-zinc-500">(optional, not a birth date)</span>
+              <input value={detailsAge} onChange={(event) => setDetailsAge(event.target.value)} type="number" min={1} max={120} step={1} inputMode="numeric" className="mt-1.5 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900" placeholder="Age in years" />
+            </label>
+            {detailsError && <p role="alert" className="text-sm text-rose-700">{detailsError}</p>}
+            <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => { const nextSettings = { ...settings, personalDetailsPromptSeen: true }; setSettings(nextSettings); saveLocalAppState(userId, { cycleProfile: profile, tasks, appSettings: nextSettings, chatMessages: messages }); setDetailsError(""); }} className="min-h-11 rounded-lg border border-zinc-200 px-4 text-sm font-medium text-zinc-700 hover:bg-zinc-50">Skip</button>
+              <button type="submit" className="min-h-11 rounded-lg bg-sage px-4 text-sm font-semibold text-white hover:bg-sage-dark">Continue</button>
+            </div>
+          </form>
+        </section>
+      </div>}
+
+      {activeView !== "login" && <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-base px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+        <div className={`mx-auto grid max-w-lg ${COMMUNITY_ENABLED ? "grid-cols-5" : "grid-cols-4"}`}>
+          {[
+            { key: "today" as const, label: "Today", icon: Home },
+            { key: "calendar" as const, label: "Calendar", icon: CalendarDays },
+            { key: "log" as const, label: "Log", icon: HeartPulse },
+            ...(COMMUNITY_ENABLED ? [{ key: "community" as const, label: "Community", icon: UsersRound }] : [{ key: "planner" as const, label: "Planner", icon: ListTodo }]),
+          ].map(({ key, label, icon: Icon }) => (
+            <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { setMoreOpen(false); if (key === "log") { setEditingLogDate(undefined); setFocusCheckin(true); setActiveView("today"); } else setActiveView(key); }} className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium ${activeView === key || (key === "log" && focusCheckin) ? "text-sage-dark" : "text-zinc-500"}`}>
+              <Icon className="h-5 w-5" strokeWidth={1.8} />{label}
+            </button>
+          ))}
+          <button type="button" aria-expanded={moreOpen} aria-haspopup="menu" onClick={() => setMoreOpen((value) => !value)} className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium ${moreOpen || ["history", "report", "settings"].includes(activeView) ? "text-sage-dark" : "text-zinc-500"}`}><MoreHorizontal className="h-5 w-5" />More</button>
+        </div>
+      </nav>}
+      {moreOpen && <div role="menu" aria-label="More destinations" className="fixed bottom-[4.5rem] right-3 z-50 w-52 rounded-lg border border-zinc-200 bg-white p-2 shadow-xl lg:hidden">
+        {[...(COMMUNITY_ENABLED ? [{ key: "planner" as const, label: "Planner", icon: ListTodo }] : []), { key: "history" as const, label: "History", icon: FileText }, { key: "report" as const, label: "Health report", icon: HeartPulse }, { key: "settings" as const, label: "Settings", icon: Settings }].map(({ key, label, icon: Icon }) => <button key={key} role="menuitem" type="button" onClick={() => { setActiveView(key); setMoreOpen(false); }} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-zinc-700 hover:bg-zinc-100"><Icon className="h-4 w-4" />{label}</button>)}
+      </div>}
     </div>
   );
 }

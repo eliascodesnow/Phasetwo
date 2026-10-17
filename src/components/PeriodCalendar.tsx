@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Droplets, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Droplets, HeartPulse, Plus } from "lucide-react";
 import type { CycleProfile } from "../types";
-import type { SymptomLog } from "../lib/symptoms";
+import { SYMPTOM_LABELS, type SymptomLog } from "../lib/symptoms";
 import { nextPeriodEstimate } from "../lib/cycleUtils";
 
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH_FORMATTER = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" });
 
 function dateKey(date: Date): string {
@@ -64,6 +64,7 @@ function MonthGrid({
   selectedDate,
   today,
   onSelect,
+  onMonthChange,
 }: {
   month: Date;
   profile: CycleProfile;
@@ -71,15 +72,16 @@ function MonthGrid({
   selectedDate: string;
   today: string;
   onSelect: (date: string) => void;
+  onMonthChange: (date: Date) => void;
 }) {
-  const starts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
-  const estimatedStart = dateKey(nextPeriodEstimate(profile));
+  const starts = profile.periodStartDates ?? [];
+  const estimatedStart = starts.length ? dateKey(nextPeriodEstimate(profile)) : "";
 
   return (
     <div>
-      <h3 className="mb-3 font-display text-sm font-semibold text-zinc-800">{MONTH_FORMATTER.format(month)}</h3>
-      <div className="grid grid-cols-7 gap-1 text-center">
-        {WEEKDAYS.map((weekday, index) => <span key={`${weekday}-${index}`} className="py-1 text-[10px] font-semibold uppercase text-zinc-400">{weekday}</span>)}
+      <h3 className="mb-3 px-3 font-display text-sm font-semibold text-zinc-800 sm:px-0">{MONTH_FORMATTER.format(month)}</h3>
+      <div className="grid grid-cols-7 gap-0 text-center">
+        {WEEKDAYS.map((weekday) => <span key={weekday} aria-label={weekday} className="py-1 text-center text-[10px] font-semibold uppercase text-zinc-400">{weekday.slice(0, 1)}</span>)}
         {monthCells(month).map((date, index) => {
           if (!date) return <span key={`empty-${index}`} className="aspect-square" />;
           const key = dateKey(date);
@@ -90,24 +92,37 @@ function MonthGrid({
           const pain = Boolean(log && log.pain_score > 0);
           const selected = key === selectedDate;
           const dayTone = period
-            ? "bg-[#b96070] text-white"
+            ? "bg-sage text-white"
             : estimated
-              ? "bg-[#f5dce0] text-[#8b4653]"
+              ? "border border-dashed border-sage bg-sage-light text-sage-dark"
               : key === today
-                ? "bg-sage text-white"
+                ? "bg-zinc-100 text-zinc-900"
                 : "text-zinc-700 hover:bg-sage-light";
           return (
             <button
               key={key}
+              id={`calendar-day-${key}`}
               type="button"
               onClick={() => onSelect(key)}
+              onKeyDown={(event) => {
+                const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+                const offset = offsets[event.key];
+                if (!offset) return;
+                event.preventDefault();
+                const nextDate = new Date(date);
+                nextDate.setDate(nextDate.getDate() + offset);
+                const nextKey = dateKey(nextDate);
+                onSelect(nextKey);
+                if (nextDate.getMonth() !== month.getMonth() || nextDate.getFullYear() !== month.getFullYear()) onMonthChange(nextDate);
+                window.requestAnimationFrame(() => document.getElementById(`calendar-day-${nextKey}`)?.focus());
+              }}
               aria-label={`${MONTH_FORMATTER.format(month)} ${date.getDate()}${period ? ", recorded period" : estimated ? ", estimated period" : ""}${pain ? `, pain ${log?.pain_score} out of 10` : ""}`}
               aria-pressed={selected}
-              className={`relative flex aspect-square min-h-9 items-center justify-center rounded-full text-xs transition-colors sm:min-h-10 ${dayTone} ${selected ? "ring-2 ring-offset-2 ring-sage" : ""}`}
+              className={`relative flex aspect-square min-h-10 items-center justify-center rounded-full text-sm transition-colors sm:min-h-11 ${dayTone} ${selected ? "ring-2 ring-offset-2 ring-sage" : key === today ? "ring-1 ring-sage" : ""}`}
             >
               {date.getDate()}
-              {pain && <span className={`absolute bottom-1 h-1 w-1 rounded-full ${period || key === today ? "bg-white" : "bg-[#b96070]"}`} />}
-              {starts.includes(key) && <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-white ring-1 ring-[#b96070]" />}
+              {pain && <span className={`absolute bottom-1 rounded-full ${period ? "bg-white" : "bg-sage-dark"}`} style={{ width: `${4 + (log?.pain_score ?? 0) * 0.6}px`, height: `${4 + (log?.pain_score ?? 0) * 0.6}px` }} />}
+              {starts.includes(key) && <span className="absolute right-0 top-0 h-2 w-2 rounded-full bg-white ring-2 ring-sage" />}
             </button>
           );
         })}
@@ -121,33 +136,36 @@ export function PeriodCalendar({
   logs,
   onRecordPeriodStart,
   showRecordButton = true,
+  onEditLog,
 }: {
   profile: CycleProfile;
   logs: SymptomLog[];
   onRecordPeriodStart: (date: string) => void;
   showRecordButton?: boolean;
+  onEditLog?: (date: string) => void;
 }) {
   const today = dateKey(new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12));
   const [selectedDate, setSelectedDate] = useState(today);
-  const [twoMonths, setTwoMonths] = useState(true);
-  const starts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
+  const [twoMonths, setTwoMonths] = useState(false);
+  const starts = profile.periodStartDates ?? [];
   const selectedLog = logs.find((log) => log.log_date === selectedDate);
-  const estimatedStart = dateKey(nextPeriodEstimate(profile));
+  const estimatedStart = starts.length ? dateKey(nextPeriodEstimate(profile)) : "";
   const selectedClassification = classifyDay(selectedDate, starts, profile.periodLength, today, estimatedStart);
   const selectedIsPeriod = selectedClassification === "recorded";
   const selectedIsEstimated = selectedClassification === "estimated";
 
   return (
-    <section className="rounded-xl border border-zinc-200 bg-white p-4 shadow-card sm:p-6" aria-label="Period calendar">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <section className="-mx-4 rounded-none border-x-0 border-y border-zinc-200 bg-white p-0 shadow-none sm:mx-0 sm:rounded-xl sm:border sm:p-6 sm:shadow-card" aria-label="Period calendar">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-3 pt-3 sm:px-0 sm:pt-0">
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, -1))} aria-label="Previous month" className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100">
+          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, -1))} aria-label="Previous month" className="flex h-11 w-11 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100">
             <ChevronLeft className="h-4 w-4" strokeWidth={1.75} />
           </button>
-          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, 1))} aria-label="Next month" className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100">
+          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, 1))} aria-label="Next month" className="flex h-11 w-11 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100">
             <ChevronRight className="h-4 w-4" strokeWidth={1.75} />
           </button>
+          <button type="button" onClick={() => { setVisibleMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12)); setSelectedDate(today); }} className="min-h-11 rounded-md px-3 text-sm font-medium text-sage-dark hover:bg-sage-light">Today</button>
         </div>
         <label className="flex items-center gap-2 text-xs font-medium text-zinc-500">
           <input type="checkbox" checked={twoMonths} onChange={(event) => setTwoMonths(event.target.checked)} className="h-4 w-4 accent-[#4A6B5D]" />
@@ -155,33 +173,40 @@ export function PeriodCalendar({
         </label>
       </div>
 
-      <div className={`grid gap-6 ${twoMonths ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 max-w-md"}`}>
-        <MonthGrid month={visibleMonth} profile={profile} logs={logs} selectedDate={selectedDate} today={today} onSelect={setSelectedDate} />
-        {twoMonths && <MonthGrid month={addMonths(visibleMonth, 1)} profile={profile} logs={logs} selectedDate={selectedDate} today={today} onSelect={setSelectedDate} />}
+      <div className={`grid gap-6 ${twoMonths ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 max-w-md"}`}>
+        <MonthGrid month={visibleMonth} profile={profile} logs={logs} selectedDate={selectedDate} today={today} onSelect={setSelectedDate} onMonthChange={(date) => setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1, 12))} />
+        {twoMonths && <MonthGrid month={addMonths(visibleMonth, 1)} profile={profile} logs={logs} selectedDate={selectedDate} today={today} onSelect={setSelectedDate} onMonthChange={(date) => setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1, 12))} />}
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-zinc-100 pt-4 text-[11px] text-zinc-500">
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#b96070]" />Recorded period</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#f5dce0]" />Estimated period</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sage" />Today</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#b96070]" />Pain log</span>
+      <div className="mx-3 mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-zinc-100 pt-4 text-sm text-zinc-500 sm:mx-0">
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sage" />Recorded period</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border border-dashed border-sage bg-sage-light" />Estimated period</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border border-sage bg-zinc-100" />Today</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-sage-dark" />Pain log</span>
       </div>
 
-      <div className="mt-4 flex flex-col justify-between gap-3 rounded-lg bg-[#fbf7f5] p-3 sm:flex-row sm:items-center">
+      <div className="mx-3 mb-3 mt-4 flex flex-col justify-between gap-3 rounded-lg bg-zinc-50 p-3 sm:mx-0 sm:mb-0 sm:flex-row sm:items-center">
         <div className="flex items-start gap-2 text-sm text-zinc-700">
-          <Droplets className="mt-0.5 h-4 w-4 flex-none text-[#b96070]" />
+          <Droplets className="mt-0.5 h-4 w-4 flex-none text-sage" />
           <div>
             <p className="font-medium">{new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(dateAtNoon(selectedDate))}</p>
-            <p className="mt-0.5 text-xs text-zinc-500">
-              {selectedIsPeriod ? "Recorded period day" : selectedIsEstimated ? "Estimated period day" : "No period recorded"}
-              {selectedLog ? ` · Pain ${selectedLog.pain_score}/10 · ${selectedLog.bleeding ?? "No bleeding entry"} bleeding` : " · No pain log"}
-            </p>
+            <p className="mt-0.5 text-sm text-zinc-500">{selectedIsPeriod ? "Recorded period day" : selectedIsEstimated ? "Estimated period day" : "No period recorded"}</p>
+            {selectedLog ? <div className="mt-2 space-y-1 text-sm text-zinc-600">
+              <p>Pain {selectedLog.pain_score}/10 · {selectedLog.bleeding ?? "No bleeding entry"} bleeding</p>
+              <p>{selectedLog.symptoms.length ? selectedLog.symptoms.map((symptom) => SYMPTOM_LABELS[symptom]).join(", ") : "No other symptoms recorded"}</p>
+              {selectedLog.notes && <p className="whitespace-pre-wrap">{selectedLog.notes}</p>}
+            </div> : <p className="mt-1 text-sm text-zinc-500">No check-in recorded</p>}
           </div>
         </div>
         {showRecordButton && (
-          <button type="button" disabled={selectedDate > today} onClick={() => onRecordPeriodStart(selectedDate)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-sage text-white hover:bg-sage-dark disabled:opacity-50">
-            <Plus className="h-4 w-4" />Record period
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {onEditLog && <button type="button" disabled={selectedDate > today} onClick={() => onEditLog(selectedDate)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-zinc-200 px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50">
+              <HeartPulse className="h-4 w-4" />{selectedLog ? "Edit check-in" : "Add check-in"}
+            </button>}
+            <button type="button" disabled={selectedDate > today} onClick={() => onRecordPeriodStart(selectedDate)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-sage px-3 text-sm font-semibold text-white hover:bg-sage-dark disabled:opacity-50">
+              <Plus className="h-4 w-4" />Record period
+            </button>
+          </div>
         )}
       </div>
     </section>

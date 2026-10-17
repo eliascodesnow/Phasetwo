@@ -66,9 +66,10 @@ export function LDRModule({
 
       {/* Virtual date ideas, phase-aligned */}
       <div className="mt-6">
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
-          Virtual date ideas · matched to {phase.label.toLowerCase()} energy
+        <p className="text-sm font-medium text-zinc-600">
+          Virtual date ideas · inspired by the {phase.label.toLowerCase()} phase
         </p>
+        <p className="mt-1 text-sm leading-relaxed text-zinc-500">These are suggestions, not a prediction of how your partner feels. Ask what would feel good today.</p>
         <ul className="mt-2 space-y-1.5">
           {ideas.map((idea) => (
             <li

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BookOpen, ClipboardList, Copy, ExternalLink, HeartHandshake, X } from "lucide-react";
 import type { CycleProfile } from "../types";
 import {
@@ -98,19 +98,11 @@ function buildAppointmentSummary(logs: SymptomLog[], profile: CycleProfile): str
 }
 
 export function EndometriosisAwareness({ logs, profile }: { logs: SymptomLog[]; profile: CycleProfile }) {
-  const [factIndex, setFactIndex] = useState(() => Math.floor(Math.random() * ENDOMETRIOSIS_FACTS.length));
   const [summary, setSummary] = useState("");
   const [copied, setCopied] = useState(false);
   const patternSummary = analyzeSymptomPatterns(logs, profile);
   const cycleGroups = getCycleGroups(logs, profile).reverse();
-  const currentFact = ENDOMETRIOSIS_FACTS[factIndex];
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setFactIndex((current) => (current + 1 + Math.floor(Math.random() * (ENDOMETRIOSIS_FACTS.length - 1))) % ENDOMETRIOSIS_FACTS.length);
-    }, 45000);
-    return () => window.clearInterval(timer);
-  }, []);
+  const currentFact = ENDOMETRIOSIS_FACTS[0];
 
   async function copySummary() {
     try {

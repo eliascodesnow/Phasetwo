@@ -1,63 +1,28 @@
-import { useMemo } from "react";
 import type { CycleProfile, PhaseInfo } from "../types";
 import {
   currentCycleDay,
   cycleProgressPercent,
   nextPeriodEstimate,
   phaseForDay,
+  PHASES,
 } from "../lib/cycleUtils";
 
 const PHASE_TONE: Record<PhaseInfo["key"], { bg: string; text: string; line: string }> = {
-  menstrual: { bg: "bg-phase-menstrual-bg", text: "text-phase-menstrual-text", line: "#E11D48" },
-  follicular: { bg: "bg-phase-follicular-bg", text: "text-phase-follicular-text", line: "#10B981" },
-  ovulatory: { bg: "bg-phase-ovulatory-bg", text: "text-phase-ovulatory-text", line: "#F59E0B" },
-  luteal: { bg: "bg-phase-luteal-bg", text: "text-phase-luteal-text", line: "#6366F1" },
+  menstrual: { bg: "bg-phase-menstrual-bg", text: "text-phase-menstrual-text", line: "var(--phase-menstrual-line)" },
+  follicular: { bg: "bg-phase-follicular-bg", text: "text-phase-follicular-text", line: "var(--phase-follicular-line)" },
+  ovulatory: { bg: "bg-phase-ovulatory-bg", text: "text-phase-ovulatory-text", line: "var(--phase-ovulatory-line)" },
+  luteal: { bg: "bg-phase-luteal-bg", text: "text-phase-luteal-text", line: "var(--phase-luteal-line)" },
 };
 
-/** A quiet 28-point energy curve across the cycle, today marked with a dot. */
-function EnergyCurve({ cycleLength, day }: { cycleLength: number; day: number }) {
-  const width = 100;
-  const height = 28;
-  const points = useMemo(() => {
-    const n = 48;
-    const pts: [number, number][] = [];
-    for (let i = 0; i <= n; i++) {
-      const d = (i / n) * cycleLength;
-      const phase = phaseForDay(Math.max(1, Math.ceil(d)), cycleLength);
-      const energyLevel =
-        phase.energy === "low" ? 0.15 : phase.energy === "rising" ? 0.55 : phase.energy === "peak" ? 0.95 : 0.35;
-      // taper luteal down toward the end
-      const tail =
-        phase.key === "luteal"
-          ? 1 - (d - phase.dayRange[0]) / Math.max(1, phase.dayRange[1] - phase.dayRange[0])
-          : 1;
-      const y = height - (energyLevel * Math.max(0.25, tail)) * height;
-      const x = (d / cycleLength) * width;
-      pts.push([x, y]);
-    }
-    return pts;
-  }, [cycleLength]);
-
-  const path = points
-    .map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`)
-    .join(" ");
-
-  const todayX = (Math.min(day, cycleLength) / cycleLength) * width;
-  const todayY =
-    points[Math.round((Math.min(day, cycleLength) / cycleLength) * (points.length - 1))]?.[1] ??
-    height / 2;
-
-  return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      className="w-full h-10"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-    >
-      <path d={path} fill="none" stroke="#D4D4D8" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
-      <circle cx={todayX} cy={todayY} r={2.2} fill="#27272A" />
-    </svg>
-  );
+function getPhaseSegments(cycleLength: number): Array<{ key: PhaseInfo["key"]; days: number }> {
+  const segments: Array<{ key: PhaseInfo["key"]; days: number }> = [];
+  for (let cycleDay = 1; cycleDay <= cycleLength; cycleDay += 1) {
+    const key = phaseForDay(cycleDay, cycleLength).key;
+    const last = segments[segments.length - 1];
+    if (last?.key === key) last.days += 1;
+    else segments.push({ key, days: 1 });
+  }
+  return segments;
 }
 
 export function CycleHeader({
@@ -74,62 +39,48 @@ export function CycleHeader({
   const nextPeriod = nextPeriodEstimate(profile);
   const tone = PHASE_TONE[phase.key];
   const label = ownerLabelOverride ?? profile.ownerLabel;
+  const hasRecordedStarts = Boolean(profile.periodStartDates?.length);
+  const phaseSegments = getPhaseSegments(profile.cycleLength);
+  const markerPosition = ((Math.min(day, profile.cycleLength) - 0.5) / profile.cycleLength) * 100;
+  const cycleLabel = label === "You" ? "Your cycle" : `${label}’s cycle`;
 
   return (
-    <section className="bg-white border border-zinc-200 rounded-xl shadow-card p-6 sm:p-8">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-card sm:p-7">
+      <div className="grid gap-6 sm:grid-cols-[1fr_auto] sm:items-start">
         <div>
-          <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
-            {label}'s cycle
-          </p>
-          <div className="flex items-baseline gap-3 mt-1">
-            <h2 className="font-display text-2xl sm:text-3xl font-semibold text-zinc-900">
-              Day {day}
-            </h2>
-            <span
-              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${tone.bg} ${tone.text}`}
-            >
-              {phase.label}
-            </span>
+          <p className="text-sm font-medium text-zinc-500">{cycleLabel}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <h2 className="font-display text-3xl font-bold leading-tight text-zinc-900">{hasRecordedStarts ? `Day ${day}` : "Cycle setup"}</h2>
+            {hasRecordedStarts && <span className={`inline-flex min-h-8 items-center rounded-full px-3 text-sm font-semibold ${tone.bg} ${tone.text}`}>{phase.label}</span>}
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-zinc-500">Next period est.</p>
-          <p className="text-sm font-medium text-zinc-800 tabular">
-            {nextPeriod.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+        <div className="sm:text-right">
+          <p className="text-sm text-zinc-500">{hasRecordedStarts ? "Estimated next period" : "Cycle estimates"}</p>
+          <p className="mt-1 font-display text-xl font-semibold text-zinc-900 tabular">
+            {hasRecordedStarts ? nextPeriod.toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Not available"}
           </p>
+          {!hasRecordedStarts && <p className="mt-1 text-sm text-zinc-500">Limited history</p>}
         </div>
       </div>
 
-      <div className="mt-5">
-        <div className="h-1.5 w-full rounded-full bg-zinc-100 overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${progress}%`, backgroundColor: tone.line }}
-          />
+      {hasRecordedStarts ? <div className="mt-7">
+        <div className="relative pt-1" role="img" aria-label={`Estimated phase timeline. Today is cycle day ${day}, ${phase.label.toLowerCase()} phase.`}>
+          <div className="flex h-3 overflow-hidden rounded-full bg-zinc-100">
+            {phaseSegments.map((segment) => <span key={segment.key} className="h-full opacity-70" style={{ width: `${(segment.days / profile.cycleLength) * 100}%`, backgroundColor: PHASE_TONE[segment.key].line }} />)}
+          </div>
+          <span className="absolute -top-1 h-5 w-0.5 -translate-x-1/2 rounded bg-zinc-900" style={{ left: `${markerPosition}%` }} />
+          <span className="absolute -top-1 h-5 w-2 -translate-x-1/2 rounded-full border-2 border-white bg-zinc-900" style={{ left: `${markerPosition}%` }} />
         </div>
-        <div className="flex justify-between text-[11px] text-zinc-400 mt-1.5 tabular">
-          <span>Day 1</span>
-          <span>{progress}% through cycle</span>
-          <span>Day {profile.cycleLength}</span>
+        <div className="mt-3 grid grid-cols-4 gap-2">
+          {PHASES.map((item) => <span key={item.key} className={`text-xs leading-5 ${item.key === phase.key ? "font-semibold text-zinc-900" : "text-zinc-500"}`}>{item.label}</span>)}
         </div>
+      </div> : <div className="mt-7 border-y border-zinc-200 py-5 text-sm text-zinc-600">Add your most recent period start in Settings to build a phase timeline and date estimate.</div>}
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200 pt-4 text-sm">
+        {hasRecordedStarts && <p className="text-zinc-600">Phase-based patterns are a loose reference; many people experience cycles differently. Adjust to how you feel.</p>}
+        {hasRecordedStarts && <p className="shrink-0 text-zinc-500 tabular">{progress}% estimated</p>}
       </div>
-
-      <div className="mt-5">
-        <EnergyCurve cycleLength={profile.cycleLength} day={day} />
-        <p className="text-[11px] text-zinc-400 mt-1">Relative energy across the cycle · today marked</p>
-      </div>
-
-      <p className="mt-5 text-sm leading-relaxed text-zinc-600 border-t border-zinc-100 pt-4">
-        {phase.summary}
-      </p>
-
-      {profile.periodStartDates && profile.periodStartDates.length > 0 && (
-        <div className="mt-3 text-xs leading-relaxed text-zinc-500">
-          <p>{profile.periodStartDates.length} period starts recorded · Cycle length uses the average of up to six recorded intervals.</p>
-          <p className="mt-1">Recent starts: {profile.periodStartDates.slice(-6).reverse().join(", ")}</p>
-        </div>
-      )}
+      {hasRecordedStarts && <p className="mt-2 text-sm text-zinc-500">{profile.periodStartDates?.length} period starts recorded. Estimates use up to six recorded intervals.</p>}
     </section>
   );
 }

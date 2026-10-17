@@ -2,9 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: dark;
+  --color-base: #171218;
+  --color-surface: #211a23;
+  --color-ink: #f6eff4;
+  --color-mute: #c2b6c1;
+  --accent: #9f4b66;
+  --accent-strong: #834157;
+  --accent-readable: #f0a2b8;
+  --accent-button: #a64d68;
+  --accent-deep: #75334a;
+  --accent-soft: #3a2632;
+  --shadow-card: 0 14px 36px -26px rgb(0 0 0 / 75%);
+  --zinc-50: #211a23;
+  --zinc-100: #2b222e;
+  --zinc-200: #3a2e3d;
+  --zinc-300: #514354;
+  --zinc-400: #9b8c9c;
+  --zinc-500: #b3a6b5;
+  --zinc-600: #c7bbc8;
+  --zinc-700: #ded4df;
+  --zinc-800: #eee6ef;
+  --zinc-900: #f7f1f7;
+  --zinc-950: #fffaff;
+  --phase-menstrual-bg: #402532;
+  --phase-menstrual-text: #f2a0b7;
+  --phase-menstrual-line: #e87998;
+  --phase-follicular-bg: #20382f;
+  --phase-follicular-text: #a5d3b8;
+  --phase-follicular-line: #79b993;
+  --phase-ovulatory-bg: #45351f;
+  --phase-ovulatory-text: #f1c47d;
+  --phase-ovulatory-line: #e4ae61;
+  --phase-luteal-bg: #332b42;
+  --phase-luteal-text: #c4b1e0;
+  --phase-luteal-line: #ad91d4;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --color-base: #f8f4f6;
+  --color-surface: #fffdfd;
+  --color-ink: #30242d;
+  --color-mute: #746773;
+  --accent: #a64d68;
+  --accent-strong: #873c56;
+  --accent-readable: #873c56;
+  --accent-button: #a64d68;
+  --accent-deep: #873c56;
+  --accent-soft: #f4e6eb;
+  --shadow-card: 0 12px 32px -26px rgb(62 34 48 / 38%);
+  --zinc-50: #fbf8fa;
+  --zinc-100: #f4eef2;
+  --zinc-200: #e8dfe5;
+  --zinc-300: #d4c8d1;
+  --zinc-400: #8d7f8b;
+  --zinc-500: #756873;
+  --zinc-600: #60545e;
+  --zinc-700: #4b4049;
+  --zinc-800: #392f37;
+  --zinc-900: #30242d;
+  --zinc-950: #241b22;
+  --phase-menstrual-bg: #f8e7ec;
+  --phase-menstrual-text: #913e57;
+  --phase-menstrual-line: #c35d79;
+  --phase-follicular-bg: #e4f1e9;
+  --phase-follicular-text: #35624a;
+  --phase-follicular-line: #5b9a72;
+  --phase-ovulatory-bg: #f8efdc;
+  --phase-ovulatory-text: #79561f;
+  --phase-ovulatory-line: #b27c2e;
+  --phase-luteal-bg: #eee8f7;
+  --phase-luteal-text: #5e4b7c;
+  --phase-luteal-line: #8871b0;
+}
+
 @layer base {
-  html {
-    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  html, body {
+    min-width: 320px;
+    font-family: "DM Sans", system-ui, sans-serif;
   }
   body {
     @apply bg-base text-zinc-800 antialiased;
@@ -13,18 +90,68 @@
     @apply bg-sage-light text-sage-dark;
   }
   *:focus-visible {
-    outline: 2px solid #4a6b5d;
-    outline-offset: 2px;
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  button, input, select, textarea {
+    font: inherit;
   }
 }
 
 @layer utilities {
   .font-display {
-    font-family: "Inter Tight", "Inter", system-ui, sans-serif;
+    font-family: "Manrope", "DM Sans", system-ui, sans-serif;
   }
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+}
+
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-white\/80,
+html[data-theme="dark"] .bg-white\/90 {
+  background-color: var(--color-surface);
+}
+
+html[data-theme="dark"] .border-white {
+  border-color: var(--zinc-200);
+}
+
+.bg-sage {
+  background-color: var(--accent-button);
+}
+
+.bg-sage-dark {
+  background-color: var(--accent-deep);
+}
+
+.text-sage,
+.text-sage-dark {
+  color: var(--accent-readable);
+}
+
+.border-sage {
+  border-color: var(--accent);
+}
+
+::placeholder {
+  color: var(--zinc-400);
+  opacity: 1;
+}
+
+button, a, input, select, textarea, summary {
+  transition-duration: 180ms;
+  transition-timing-function: ease;
+}
+
+button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+summary,
+input:not([type="checkbox"]):not([type="radio"]) {
+  min-height: 44px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -8,9 +8,9 @@ function dateLabel(value: string): string {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(`${value}T12:00:00`));
 }
 
-function buildReport(profile: CycleProfile, logs: SymptomLog[]): string {
+function buildReport(profile: CycleProfile, logs: SymptomLog[], displayName?: string, age?: number): string {
   const ascendingLogs = [...logs].sort((left, right) => left.log_date.localeCompare(right.log_date));
-  const recordedStarts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
+  const recordedStarts = profile.periodStartDates ?? [];
   const intervals = recordedStarts.slice(1).map((start, index) => (Date.parse(`${start}T12:00:00`) - Date.parse(`${recordedStarts[index]}T12:00:00`)) / 86400000);
   const average = intervals.length ? `${(intervals.reduce((sum, days) => sum + days, 0) / intervals.length).toFixed(1)} days based on ${intervals.length} observed intervals` : `Not enough bleeding-start entries to calculate; profile setting is ${profile.cycleLength} days`;
   const painAverage = ascendingLogs.length ? `${(ascendingLogs.reduce((sum, log) => sum + log.pain_score, 0) / ascendingLogs.length).toFixed(1)}/10` : "No entries recorded";
@@ -21,10 +21,12 @@ function buildReport(profile: CycleProfile, logs: SymptomLog[]): string {
   return [
     "PHASETWO MENSTRUAL HEALTH HISTORY",
     `Prepared ${new Intl.DateTimeFormat("en", { dateStyle: "long" }).format(new Date())}`,
+    ...(displayName ? [`Name: ${displayName}`] : []),
+    ...(age ? [`Age at time of report: ${age}`] : []),
     "",
     "These are the patterns recorded in your PhaseTwo history. Share them with your healthcare professional to help provide context during your appointment.",
     "",
-    `Recorded period start dates: ${recordedStarts.map(dateLabel).join(", ")}`,
+    `Recorded period start dates: ${recordedStarts.length ? recordedStarts.map(dateLabel).join(", ") : "None recorded"}`,
     `Average cycle interval: ${average}`,
     `Period duration set in profile: ${profile.periodLength} days (estimate)`,
     `Daily symptom entries: ${ascendingLogs.length}`,
@@ -43,8 +45,8 @@ function buildReport(profile: CycleProfile, logs: SymptomLog[]): string {
   ].join("\n");
 }
 
-export function ReportView({ profile, logs }: { profile: CycleProfile; logs: SymptomLog[] }) {
-  const report = useMemo(() => buildReport(profile, logs), [profile, logs]);
+export function ReportView({ profile, logs, displayName, age }: { profile: CycleProfile; logs: SymptomLog[]; displayName?: string; age?: number }) {
+  const report = useMemo(() => buildReport(profile, logs, displayName, age), [profile, logs, displayName, age]);
   function downloadReport() {
     const url = URL.createObjectURL(new Blob([report], { type: "text/plain;charset=utf-8" }));
     const anchor = document.createElement("a");

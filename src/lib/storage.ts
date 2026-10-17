@@ -37,6 +37,7 @@ export const defaultCycleProfile: CycleProfile = {
 export const defaultSettings: AppSettings = {
   role: "self",
   ldrEnabled: false,
+  themeMode: "system",
 };
 
 export interface UserAppState {
@@ -53,11 +54,15 @@ export const storage = {
   loadTasks: () => read<Task[]>(KEYS.tasks, []),
   saveTasks: (v: Task[]) => write(KEYS.tasks, v),
 
-  loadSettings: () => {
+  loadSettings: (): AppSettings => {
     const saved = read<Partial<AppSettings>>(KEYS.settings, defaultSettings);
     return {
       role: saved.role === "partner" ? "partner" as const : "self" as const,
       ldrEnabled: Boolean(saved.ldrEnabled),
+      themeMode: saved.themeMode === "light" || saved.themeMode === "dark" ? saved.themeMode : "system",
+      displayName: typeof saved.displayName === "string" ? saved.displayName.trim().slice(0, 80) || undefined : undefined,
+      age: Number.isInteger(saved.age) && Number(saved.age) >= 1 && Number(saved.age) <= 120 ? Number(saved.age) : undefined,
+      personalDetailsPromptSeen: Boolean(saved.personalDetailsPromptSeen),
     };
   },
   saveSettings: (v: AppSettings) => write(KEYS.settings, v),
@@ -79,6 +84,14 @@ export function loadLocalAppState(userId: string): UserAppState {
       appSettings: {
         role: accountState.appSettings?.role === "partner" ? "partner" : "self",
         ldrEnabled: Boolean(accountState.appSettings?.ldrEnabled),
+        themeMode: accountState.appSettings?.themeMode === "light" || accountState.appSettings?.themeMode === "dark"
+          ? accountState.appSettings.themeMode
+          : "system",
+        displayName: typeof accountState.appSettings?.displayName === "string" ? accountState.appSettings.displayName.trim().slice(0, 80) || undefined : undefined,
+        age: Number.isInteger(accountState.appSettings?.age) && Number(accountState.appSettings.age) >= 1 && Number(accountState.appSettings.age) <= 120
+          ? Number(accountState.appSettings.age)
+          : undefined,
+        personalDetailsPromptSeen: Boolean(accountState.appSettings?.personalDetailsPromptSeen),
       },
       chatMessages: accountState.chatMessages ?? [],
     };
@@ -106,6 +119,7 @@ export function loadLocalAppState(userId: string): UserAppState {
       appSettings: {
         role: storage.loadSettings().role,
         ldrEnabled: storage.loadSettings().ldrEnabled,
+        themeMode: storage.loadSettings().themeMode,
       },
     chatMessages: storage.loadChat(),
   };

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { AlertTriangle, Trash2 } from "lucide-react";
-import type { AppSettings, CycleProfile } from "../types";
+import type { AppSettings, CycleProfile, ThemeMode } from "../types";
 import { MEDICAL_DISCLAIMER } from "../lib/endoContent";
+import { editPeriodStart } from "../lib/cycleUtils";
 import { supabase } from "../lib/supabase";
 import { PartnerInvitationPanel } from "./PartnerInvitationPanel";
 import { SaveChangesButton } from "./SaveChangesButton";
@@ -64,6 +65,24 @@ export function SettingsView({
         <p className="mt-1 text-sm text-zinc-500">Manage your cycle profile, account preferences, and private data.</p>
       </div>
 
+      <section className="border-b border-zinc-200 pb-5" aria-labelledby="appearance-heading">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 id="appearance-heading" className="font-display text-base font-semibold text-zinc-900">Appearance</h2>
+            <p className="mt-1 text-sm text-zinc-500">System follows your device preference.</p>
+          </div>
+          <div className="inline-flex rounded-lg border border-zinc-200 bg-zinc-50 p-1" role="group" aria-label="Color theme">
+            {(["system", "light", "dark"] as ThemeMode[]).map((mode) => (
+              <button key={mode} type="button" aria-pressed={(settings.themeMode ?? "system") === mode}
+                onClick={() => onSettingsChange({ ...settings, themeMode: mode })}
+                className={`min-h-10 rounded-md px-3 text-sm font-medium capitalize transition-colors ${(settings.themeMode ?? "system") === mode ? "bg-white text-zinc-900 shadow-card" : "text-zinc-600 hover:text-zinc-900"}`}>
+                {mode}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6">
           <h2 className="font-display text-base font-semibold text-zinc-900">Tracking setup</h2>
@@ -83,7 +102,7 @@ export function SettingsView({
             </fieldset>
             {settings.role === "self" && <>
               <label className="block text-xs font-medium text-zinc-600">Name to display<input value={profile.ownerLabel} onChange={(event) => onProfileChange({ ...profile, ownerLabel: event.target.value })} maxLength={80} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
-              <label className="block text-xs font-medium text-zinc-600">Most recent period start<input type="date" value={profile.lastPeriodStart} onChange={(event) => onProfileChange({ ...profile, lastPeriodStart: event.target.value })} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
+              <label className="block text-xs font-medium text-zinc-600">Most recent period start<input type="date" value={profile.lastPeriodStart} onChange={(event) => { if (event.target.value) onProfileChange(editPeriodStart(profile, profile.lastPeriodStart, event.target.value)); }} className="mt-1.5 min-h-11 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
               <label className="block text-xs font-medium text-zinc-600">Cycle length (days)<input type="number" min={20} max={45} value={profile.cycleLength} onChange={(event) => onProfileChange({ ...profile, cycleLength: Math.max(20, Math.min(45, Number(event.target.value) || 28)) })} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
               <label className="block text-xs font-medium text-zinc-600">Period duration (days)<input type="number" min={1} max={10} value={profile.periodLength} onChange={(event) => onProfileChange({ ...profile, periodLength: Math.max(1, Math.min(10, Number(event.target.value) || 5)) })} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
             </>}

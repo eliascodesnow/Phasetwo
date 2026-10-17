@@ -45,6 +45,42 @@ describe("account-scoped app state", () => {
     expect(loadLocalAppState("account-one").cycleProfile.ownerLabel).toBe("First account");
     expect(loadLocalAppState("account-two").cycleProfile.ownerLabel).toBe("Second account");
   });
+
+  it("persists theme mode per account and defaults older snapshots to system", () => {
+    const account = loadLocalAppState("theme-account");
+    account.appSettings.themeMode = "dark";
+    saveLocalAppState("theme-account", account);
+    expect(loadLocalAppState("theme-account").appSettings.themeMode).toBe("dark");
+
+    localStorage.setItem("phasetwo:user-state:older-account", JSON.stringify({
+      cycleProfile: defaultCycleProfile,
+      tasks: [],
+      appSettings: { role: "self", ldrEnabled: false },
+      chatMessages: [],
+    }));
+    expect(loadLocalAppState("older-account").appSettings.themeMode).toBe("system");
+  });
+
+  it("persists optional personal details and normalizes invalid ages", () => {
+    const guest = loadLocalAppState("local-guest");
+    guest.appSettings.displayName = "Sam";
+    guest.appSettings.age = 34;
+    guest.appSettings.personalDetailsPromptSeen = true;
+    saveLocalAppState("local-guest", guest);
+
+    const savedGuest = loadLocalAppState("local-guest");
+    expect(savedGuest.appSettings.displayName).toBe("Sam");
+    expect(savedGuest.appSettings.age).toBe(34);
+    expect(savedGuest.appSettings.personalDetailsPromptSeen).toBe(true);
+
+    localStorage.setItem("phasetwo:user-state:invalid-age", JSON.stringify({
+      cycleProfile: defaultCycleProfile,
+      tasks: [],
+      appSettings: { role: "self", ldrEnabled: false, age: 999, personalDetailsPromptSeen: true },
+      chatMessages: [],
+    }));
+    expect(loadLocalAppState("invalid-age").appSettings.age).toBeUndefined();
+  });
 });
 
 describe("weekly login streak", () => {
