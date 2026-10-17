@@ -88,7 +88,7 @@ export function CycleHeader({
           <span>{progress}% through cycle</span>
           <span>Day {profile.cycleLength}</span>
         </div>
-      </div>
+      </div> : null}
 
       <div className="mt-5">
         <EnergyCurve cycleLength={profile.cycleLength} day={day} />

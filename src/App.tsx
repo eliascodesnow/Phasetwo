@@ -287,7 +287,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
   return (
     <div className="min-h-screen bg-base">
-      <header className="border-b border-zinc-200 bg-white/80 backdrop-saturate-150 sticky top-0 z-30">
+      {!(activeView === "login" && !isAuthenticated && supabase) && <header className="border-b border-zinc-200 bg-white/80 backdrop-saturate-150 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-8">
           <div className="flex items-center gap-2 py-1">
             <Leaf className="w-4.5 h-4.5 text-sage" strokeWidth={1.75} />
