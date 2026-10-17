@@ -295,12 +295,12 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           </div>
           {activeView !== "login" && <nav aria-label="Main navigation" className="order-3 flex w-full items-center gap-1 overflow-x-auto sm:order-2 sm:w-auto">
             {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
-              <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "home") setEditingLogDate(undefined); setActiveView(key); }} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
+              <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "today") setEditingLogDate(undefined); setActiveView(key); }} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
                 <Icon className="h-4 w-4" strokeWidth={1.8} />{label}
               </button>
             ))}
           </nav>}
-          {!isAuthenticated && supabase && activeView === "login" ? <button type="button" onClick={() => setActiveView("home")} className="order-2 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100"><LogIn className="h-4 w-4 rotate-180" />Back to tracker</button> : !isAuthenticated && supabase ? <button type="button" onClick={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} aria-label="Sign in to your account" title="Sign in to your account" className="order-2 inline-flex items-center gap-2 rounded-full border border-sage bg-sage-light px-3 py-2 text-xs font-semibold text-sage-dark transition-colors hover:bg-sage/10 sm:order-3"><LogIn className="h-3.5 w-3.5" />Sign in</button> : isAuthenticated && <button
+          {!isAuthenticated && supabase && activeView === "login" ? <button type="button" onClick={() => setActiveView("today")} className="order-2 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100"><LogIn className="h-4 w-4 rotate-180" />Back to tracker</button> : !isAuthenticated && supabase ? <button type="button" onClick={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} aria-label="Sign in to your account" title="Sign in to your account" className="order-2 inline-flex items-center gap-2 rounded-full border border-sage bg-sage-light px-3 py-2 text-xs font-semibold text-sage-dark transition-colors hover:bg-sage/10 sm:order-3"><LogIn className="h-3.5 w-3.5" />Sign in</button> : isAuthenticated && <button
             type="button"
             onClick={() => void signOut()}
             aria-label="Sign out"
@@ -387,7 +387,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         <ul className="pb-safe mx-auto grid max-w-md grid-cols-4">
           {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
             <li key={key}>
-              <button type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "home") setEditingLogDate(undefined); setActiveView(key); window.scrollTo({ top: 0 }); }} className={`flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${activeView === key ? "text-sage-dark" : "text-zinc-500"}`}>
+              <button type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "today") setEditingLogDate(undefined); setActiveView(key); window.scrollTo({ top: 0 }); }} className={`flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${activeView === key ? "text-sage-dark" : "text-zinc-500"}`}>
                 <span className={`flex h-7 w-12 items-center justify-center rounded-full transition-colors ${activeView === key ? "bg-sage-light" : ""}`}><Icon className="h-5 w-5" strokeWidth={1.8} /></span>
                 {label}
               </button>
