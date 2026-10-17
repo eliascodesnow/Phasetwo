@@ -79,7 +79,7 @@ function MonthGrid({
     <div>
       <h3 className="mb-3 font-display text-sm font-semibold text-zinc-800">{MONTH_FORMATTER.format(month)}</h3>
       <div className="grid grid-cols-7 gap-1 text-center">
-        {WEEKDAYS.map((weekday, index) => <span key={`${weekday}-${index}`} className="py-1 text-[10px] font-semibold uppercase text-zinc-400">{weekday}</span>)}
+        {WEEKDAYS.map((weekday, index) => <span key={`${weekday}-${index}`} className="py-1 text-[10px] font-semibold uppercase text-zinc-500">{weekday}</span>)}
         {monthCells(month).map((date, index) => {
           if (!date) return <span key={`empty-${index}`} className="aspect-square" />;
           const key = dateKey(date);
@@ -130,7 +130,7 @@ export function PeriodCalendar({
   const today = dateKey(new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12));
   const [selectedDate, setSelectedDate] = useState(today);
-  const [twoMonths, setTwoMonths] = useState(true);
+  const [twoMonths, setTwoMonths] = useState(() => typeof window === "undefined" || window.matchMedia("(min-width: 640px)").matches);
   const starts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
   const selectedLog = logs.find((log) => log.log_date === selectedDate);
   const estimatedStart = dateKey(nextPeriodEstimate(profile));
@@ -142,14 +142,15 @@ export function PeriodCalendar({
     <section className="rounded-xl border border-zinc-200 bg-white p-4 shadow-card sm:p-6" aria-label="Period calendar">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, -1))} aria-label="Previous month" className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100">
+          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, -1))} aria-label="Previous month" className="flex h-10 w-10 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100">
             <ChevronLeft className="h-4 w-4" strokeWidth={1.75} />
           </button>
-          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, 1))} aria-label="Next month" className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100">
+          <button type="button" onClick={() => setVisibleMonth((month) => addMonths(month, 1))} aria-label="Next month" className="flex h-10 w-10 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100">
             <ChevronRight className="h-4 w-4" strokeWidth={1.75} />
           </button>
         </div>
-        <label className="flex items-center gap-2 text-xs font-medium text-zinc-500">
+        <button type="button" onClick={() => { const now = new Date(); setVisibleMonth(new Date(now.getFullYear(), now.getMonth(), 1, 12)); setSelectedDate(today); }} className="min-h-9 rounded-md px-3 text-xs font-medium text-sage-dark hover:bg-sage-light">Today</button>
+        <label className="flex min-h-9 items-center gap-2 text-xs font-medium text-zinc-500">
           <input type="checkbox" checked={twoMonths} onChange={(event) => setTwoMonths(event.target.checked)} className="h-4 w-4 accent-[#4A6B5D]" />
           Two-month view
         </label>
@@ -179,8 +180,8 @@ export function PeriodCalendar({
           </div>
         </div>
         {showRecordButton && (
-          <button type="button" disabled={selectedDate > today} onClick={() => onRecordPeriodStart(selectedDate)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-sage text-white hover:bg-sage-dark disabled:opacity-50">
-            <Plus className="h-4 w-4" />Record period
+          <button type="button" disabled={selectedDate > today} onClick={() => onRecordPeriodStart(selectedDate)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-sage px-4 text-sm font-medium text-white hover:bg-sage-dark disabled:cursor-not-allowed disabled:opacity-50">
+            <Plus className="h-4 w-4" />Record period start
           </button>
         )}
       </div>

@@ -248,20 +248,20 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const displayedProfile = showLdr && sharedCycleProfile ? sharedCycleProfile : profile;
 
   if (!appReady) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-zinc-500">Loading your workspace...</div>;
+    return <div role="status" className="flex min-h-screen flex-col items-center justify-center gap-3 text-sm text-zinc-500"><Leaf className="h-6 w-6 animate-pulse text-sage" strokeWidth={1.5} />Loading your workspace…</div>;
   }
 
   return (
     <div className="min-h-screen bg-base">
-      <header className="border-b border-zinc-200 bg-white/80 backdrop-saturate-150 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-8">
+      <header className="border-b border-zinc-200 bg-white/90 backdrop-blur backdrop-saturate-150 sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-x-6 px-4 py-2.5 sm:px-8 sm:py-3">
           <div className="flex items-center gap-2 py-1">
             <Leaf className="w-4.5 h-4.5 text-sage" strokeWidth={1.75} />
             <span className="font-display text-base font-semibold tracking-tight text-zinc-900">
               PhaseTwo
             </span>
           </div>
-          {activeView !== "login" && <nav aria-label="Main navigation" className="order-3 flex w-full items-center gap-1 overflow-x-auto sm:order-2 sm:w-auto">
+          {activeView !== "login" && <nav aria-label="Main navigation" className="hidden items-center gap-1 sm:order-2 sm:flex">
             {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
               <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "home") setEditingLogDate(undefined); setActiveView(key); }} className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${activeView === key ? "bg-zinc-100 text-zinc-900" : "text-zinc-600 hover:bg-zinc-50"}`}>
                 <Icon className="h-4 w-4" strokeWidth={1.8} />{label}
@@ -275,15 +275,15 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
             onClick={() => void signOut()}
             aria-label="Sign out"
             title="Sign out"
-            className="order-2 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 sm:order-2"
+            className="order-2 inline-flex min-h-9 items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-xs font-semibold text-zinc-600 transition-colors hover:bg-zinc-50 sm:order-3"
           >
             <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Sign out
+            <span className="hidden sm:inline">Sign out</span>
           </button>}
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto space-y-7 px-4 py-6 pb-24 sm:px-8 sm:py-8">
+      <main className="max-w-6xl mx-auto space-y-6 px-4 py-5 pb-32 sm:space-y-7 sm:px-8 sm:py-8 sm:pb-24">
         {!isAuthenticated && supabase && activeView === "login" && <section className="mx-auto max-w-lg rounded-[28px] border border-zinc-200 bg-white p-6 shadow-card sm:p-8">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sage-light text-sage-dark">
@@ -317,9 +317,9 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         {activeView === "home" && <>
           <CycleHeader profile={displayedProfile} />
           {settings.role === "self" && isAuthenticated && <WeeklyStreakCard weeks={weeklyLoginStreak} />}
-          {settings.role === "self" && <div className="mx-auto flex justify-center">
-            <button type="button" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-sage-dark px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-sage-darker">
-              <HeartPulse className="h-4 w-4" />Record period
+          {settings.role === "self" && <div className="mx-auto flex w-full justify-center sm:w-auto">
+            <button type="button" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-sage-dark px-5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-sage-darker active:scale-[0.99] sm:w-auto">
+              <HeartPulse className="h-4 w-4" />Period started today
             </button>
           </div>}
           <PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => ({ ...current, lastPeriodStart: date }))} />
@@ -339,8 +339,21 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
       <footer className="max-w-6xl mx-auto px-6 sm:px-10 py-8 text-xs text-zinc-400">
         {isAuthenticated ? "Your cycle, plans, and symptom history stay in your account." : "Your cycle, plans, and symptom history stay on this device."} Partner sync is invitation-only; Bella can help with shared advice when enabled.
-        {syncError && <span role="status" className="ml-2 text-red-700">Sync issue: {syncError}</span>}
+        {syncError && <p role="status" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">Sync issue: {syncError}</p>}
       </footer>
+
+      {activeView !== "login" && <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 backdrop-blur sm:hidden">
+        <ul className="pb-safe mx-auto grid max-w-md grid-cols-4">
+          {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
+            <li key={key}>
+              <button type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "home") setEditingLogDate(undefined); setActiveView(key); window.scrollTo({ top: 0 }); }} className={`flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${activeView === key ? "text-sage-dark" : "text-zinc-500"}`}>
+                <span className={`flex h-7 w-12 items-center justify-center rounded-full transition-colors ${activeView === key ? "bg-sage-light" : ""}`}><Icon className="h-5 w-5" strokeWidth={1.8} /></span>
+                {label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>}
 
       {settings.role === "self" && <AskBellaLauncher />}
       {showLdr && <PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} />}

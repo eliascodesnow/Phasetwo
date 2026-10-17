@@ -17,6 +17,7 @@ export default {
         sage: {
           DEFAULT: "#4A6B5D",
           dark: "#37524A",
+          darker: "#2B4239",
           light: "#E7EDE9",
         },
         slate: {
