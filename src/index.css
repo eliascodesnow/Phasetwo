@@ -12,6 +12,11 @@
   ::selection {
     @apply bg-sage-light text-sage-dark;
   }
+  button,
+  [role="button"],
+  input[type="range"] {
+    touch-action: manipulation;
+  }
   *:focus-visible {
     outline: 2px solid #4a6b5d;
     outline-offset: 2px;
@@ -24,6 +29,9 @@
   }
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 

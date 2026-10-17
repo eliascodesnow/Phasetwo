@@ -73,6 +73,10 @@ export function CycleHeader({
   const progress = cycleProgressPercent(profile);
   const nextPeriod = nextPeriodEstimate(profile);
   const tone = PHASE_TONE[phase.key];
+  const daysUntilNext = (() => {
+    const diff = Math.round((new Date(nextPeriod.getFullYear(), nextPeriod.getMonth(), nextPeriod.getDate()).getTime() - new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime()) / 86400000);
+    return diff >= 0 ? diff : null;
+  })();
   const label = ownerLabelOverride ?? profile.ownerLabel;
 
   return (
@@ -83,7 +87,7 @@ export function CycleHeader({
             {label}'s cycle
           </p>
           <div className="flex items-baseline gap-3 mt-1">
-            <h2 className="font-display text-2xl sm:text-3xl font-semibold text-zinc-900">
+            <h2 className="font-display text-3xl font-semibold text-zinc-900">
               Day {day}
             </h2>
             <span
@@ -98,6 +102,7 @@ export function CycleHeader({
           <p className="text-sm font-medium text-zinc-800 tabular">
             {nextPeriod.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           </p>
+          {daysUntilNext !== null && <p className="text-[11px] text-zinc-500 tabular">{daysUntilNext === 0 ? "today" : daysUntilNext === 1 ? "tomorrow" : `in ${daysUntilNext} days`}</p>}
         </div>
       </div>
 
@@ -108,7 +113,7 @@ export function CycleHeader({
             style={{ width: `${progress}%`, backgroundColor: tone.line }}
           />
         </div>
-        <div className="flex justify-between text-[11px] text-zinc-400 mt-1.5 tabular">
+        <div className="flex justify-between text-[11px] text-zinc-500 mt-1.5 tabular">
           <span>Day 1</span>
           <span>{progress}% through cycle</span>
           <span>Day {profile.cycleLength}</span>
@@ -117,7 +122,7 @@ export function CycleHeader({
 
       <div className="mt-5">
         <EnergyCurve cycleLength={profile.cycleLength} day={day} />
-        <p className="text-[11px] text-zinc-400 mt-1">Relative energy across the cycle · today marked</p>
+        <p className="text-[11px] text-zinc-500 mt-1">Relative energy across the cycle · today marked</p>
       </div>
 
       <p className="mt-5 text-sm leading-relaxed text-zinc-600 border-t border-zinc-100 pt-4">
@@ -125,10 +130,11 @@ export function CycleHeader({
       </p>
 
       {profile.periodStartDates && profile.periodStartDates.length > 0 && (
-        <div className="mt-3 text-xs leading-relaxed text-zinc-500">
-          <p>{profile.periodStartDates.length} period starts recorded · Cycle length uses the average of up to six recorded intervals.</p>
+        <details className="mt-3 text-xs leading-relaxed text-zinc-500">
+          <summary className="inline-flex min-h-9 cursor-pointer items-center text-zinc-600 hover:text-zinc-900">{profile.periodStartDates.length} period starts recorded</summary>
+          <p>Cycle length uses the average of up to six recorded intervals.</p>
           <p className="mt-1">Recent starts: {profile.periodStartDates.slice(-6).reverse().join(", ")}</p>
-        </div>
+        </details>
       )}
     </section>
   );
