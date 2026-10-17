@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { CycleProfile, PhaseInfo } from "../types";
 import {
   currentCycleDay,
@@ -13,6 +14,52 @@ const PHASE_TONE: Record<PhaseInfo["key"], { bg: string; text: string; line: str
   ovulatory: { bg: "bg-phase-ovulatory-bg", text: "text-phase-ovulatory-text", line: "var(--phase-ovulatory-line)" },
   luteal: { bg: "bg-phase-luteal-bg", text: "text-phase-luteal-text", line: "var(--phase-luteal-line)" },
 };
+
+/** A quiet energy curve across the cycle, today marked with a dot. */
+function EnergyCurve({ cycleLength, day }: { cycleLength: number; day: number }) {
+  const width = 100;
+  const height = 28;
+  const points = useMemo(() => {
+    const n = 48;
+    const pts: [number, number][] = [];
+    for (let i = 0; i <= n; i++) {
+      const d = (i / n) * cycleLength;
+      const phase = phaseForDay(Math.max(1, Math.ceil(d)), cycleLength);
+      const energyLevel =
+        phase.energy === "low" ? 0.15 : phase.energy === "rising" ? 0.55 : phase.energy === "peak" ? 0.95 : 0.35;
+      // taper luteal down toward the end
+      const tail =
+        phase.key === "luteal"
+          ? 1 - (d - phase.dayRange[0]) / Math.max(1, phase.dayRange[1] - phase.dayRange[0])
+          : 1;
+      const y = height - (energyLevel * Math.max(0.25, tail)) * height;
+      const x = (d / cycleLength) * width;
+      pts.push([x, y]);
+    }
+    return pts;
+  }, [cycleLength]);
+
+  const path = points
+    .map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`)
+    .join(" ");
+
+  const todayX = (Math.min(day, cycleLength) / cycleLength) * width;
+  const todayY =
+    points[Math.round((Math.min(day, cycleLength) / cycleLength) * (points.length - 1))]?.[1] ??
+    height / 2;
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="w-full h-10"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path d={path} fill="none" stroke="#D4D4D8" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
+      <circle cx={todayX} cy={todayY} r={2.2} fill="#27272A" />
+    </svg>
+  );
+}
 
 function getPhaseSegments(cycleLength: number): Array<{ key: PhaseInfo["key"]; days: number }> {
   const segments: Array<{ key: PhaseInfo["key"]; days: number }> = [];
@@ -88,7 +135,7 @@ export function CycleHeader({
           <span>{progress}% through cycle</span>
           <span>Day {profile.cycleLength}</span>
         </div>
-      </div>
+      </div> : null}
 
       <div className="mt-5">
         <EnergyCurve cycleLength={profile.cycleLength} day={day} />

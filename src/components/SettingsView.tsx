@@ -6,6 +6,7 @@ import { editPeriodStart } from "../lib/cycleUtils";
 import { supabase } from "../lib/supabase";
 import { PartnerInvitationPanel } from "./PartnerInvitationPanel";
 import { SaveChangesButton } from "./SaveChangesButton";
+import { disableReminders, enableReminders } from "../lib/reminders";
 
 export function SettingsView({
   settings,
@@ -34,6 +35,7 @@ export function SettingsView({
   saving: boolean;
   savedAt: Date | null;
 }) {
+  const [reminderNotice, setReminderNotice] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -69,19 +71,49 @@ export function SettingsView({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 id="appearance-heading" className="font-display text-base font-semibold text-zinc-900">Appearance</h2>
-            <p className="mt-1 text-sm text-zinc-500">System follows your device preference.</p>
+            <p className="mt-1 text-sm text-zinc-500">Light is the default.</p>
           </div>
           <div className="inline-flex rounded-lg border border-zinc-200 bg-zinc-50 p-1" role="group" aria-label="Color theme">
-            {(["system", "light", "dark"] as ThemeMode[]).map((mode) => (
-              <button key={mode} type="button" aria-pressed={(settings.themeMode ?? "system") === mode}
+            {(["light", "dark"] as ThemeMode[]).map((mode) => (
+              <button key={mode} type="button" aria-pressed={(settings.themeMode ?? "light") === mode}
                 onClick={() => onSettingsChange({ ...settings, themeMode: mode })}
-                className={`min-h-10 rounded-md px-3 text-sm font-medium capitalize transition-colors ${(settings.themeMode ?? "system") === mode ? "bg-white text-zinc-900 shadow-card" : "text-zinc-600 hover:text-zinc-900"}`}>
+                className={`min-h-10 rounded-md px-3 text-sm font-medium capitalize transition-colors ${(settings.themeMode ?? "light") === mode ? "bg-white text-zinc-900 shadow-card" : "text-zinc-600 hover:text-zinc-900"}`}>
                 {mode}
               </button>
             ))}
           </div>
         </div>
       </section>
+
+      {settings.role === "self" && <section className="border-b border-zinc-200 pb-5" aria-labelledby="reminders-heading">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 id="reminders-heading" className="font-display text-base font-semibold text-zinc-900">Period reminder</h2>
+            <p className="mt-1 text-sm text-zinc-500">Notify me 2 days before.</p>
+            {reminderNotice && <p role="status" className="mt-1 text-sm text-rose-700">{reminderNotice}</p>}
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={Boolean(settings.periodReminders)}
+            aria-label="Period reminder"
+            onClick={async () => {
+              setReminderNotice("");
+              if (settings.periodReminders) {
+                await disableReminders();
+                onSettingsChange({ ...settings, periodReminders: false });
+                return;
+              }
+              const result = await enableReminders();
+              if (result === "enabled") onSettingsChange({ ...settings, periodReminders: true });
+              else setReminderNotice(result === "denied" ? "Notifications are blocked in your browser settings." : "This browser can't show notifications.");
+            }}
+            className={`relative h-8 w-14 rounded-full transition-colors ${settings.periodReminders ? "bg-[var(--period-solid)]" : "bg-zinc-300"}`}
+          >
+            <span className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${settings.periodReminders ? "translate-x-6" : ""}`} />
+          </button>
+        </div>
+      </section>}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6">

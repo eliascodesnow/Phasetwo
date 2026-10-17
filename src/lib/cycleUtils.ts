@@ -72,13 +72,66 @@ export function recordPeriodStart(profile: CycleProfile, date: string): CyclePro
 
 export function editPeriodStart(profile: CycleProfile, previousDate: string, nextDate: string): CycleProfile {
   const starts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
-  return withPeriodStarts(profile, starts.map((date) => date === previousDate ? nextDate : date));
+  const moved = withPeriodStarts(profile, starts.map((date) => date === previousDate ? nextDate : date));
+  const end = profile.periodEnds?.[previousDate];
+  if (!end || previousDate === nextDate) return moved;
+  const { [previousDate]: _removed, ...rest } = moved.periodEnds ?? {};
+  return { ...moved, periodEnds: end >= nextDate ? { ...rest, [nextDate]: end } : rest };
 }
 
 export function removePeriodStart(profile: CycleProfile, date: string): CycleProfile {
   const starts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
   const remaining = starts.filter((start) => start !== date);
-  return withPeriodStarts(profile, remaining.length ? remaining : [profile.lastPeriodStart]);
+  const next = withPeriodStarts(profile, remaining.length ? remaining : [profile.lastPeriodStart]);
+  if (!next.periodEnds?.[date]) return next;
+  const { [date]: _removed, ...rest } = next.periodEnds;
+  return { ...next, periodEnds: rest };
+}
+
+/** Local calendar date as yyyy-mm-dd (not UTC, so late-night taps land on the right day). */
+export function dateKey(date: Date = new Date()): string {
+  return formatDateKey(date);
+}
+
+function keyDiff(from: string, to: string): number {
+  return Math.round((new Date(`${to}T12:00:00`).getTime() - new Date(`${from}T12:00:00`).getTime()) / MS_PER_DAY);
+}
+
+/** Number of days a recorded period covers: up to its recorded end, otherwise the usual length. */
+export function periodSpan(profile: Pick<CycleProfile, "periodLength" | "periodEnds">, start: string): number {
+  const end = profile.periodEnds?.[start];
+  return end && end >= start ? Math.min(14, keyDiff(start, end) + 1) : profile.periodLength;
+}
+
+/** The recorded period start whose window contains the given day, if any. */
+export function periodStartContaining(profile: CycleProfile, key: string): string | undefined {
+  const starts = profile.periodStartDates ?? [];
+  return starts.find((start) => {
+    const elapsed = keyDiff(start, key);
+    return elapsed >= 0 && elapsed < periodSpan(profile, start);
+  });
+}
+
+/** Mark the day a period ended. Ignored if it falls before the start or more than 14 days after. */
+export function recordPeriodEnd(profile: CycleProfile, start: string, end: string): CycleProfile {
+  if (end < start || keyDiff(start, end) > 13) return profile;
+  return { ...profile, periodEnds: { ...(profile.periodEnds ?? {}), [start]: end } };
+}
+
+/** Start dates of the next few predicted periods, one cycle apart. */
+export function predictedPeriodStarts(profile: CycleProfile, count = 6, asOf: Date = new Date()): string[] {
+  const cycleLength = profile.cycleLength || 28;
+  const first = nextPeriodEstimate(profile, asOf);
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(first);
+    date.setDate(date.getDate() + index * cycleLength);
+    return formatDateKey(date);
+  });
+}
+
+/** Whole days until the next predicted period start. */
+export function daysUntilNextPeriod(profile: CycleProfile, asOf: Date = new Date()): number {
+  return (profile.cycleLength || 28) - currentCycleDay(profile, asOf) + 1;
 }
 
 function withPeriodStarts(profile: CycleProfile, values: string[]): CycleProfile {

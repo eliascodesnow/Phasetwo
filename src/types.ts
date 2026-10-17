@@ -10,6 +10,8 @@ export interface CycleProfile {
   periodStartDates?: string[];
   cycleLength: number; // default 28
   periodLength: number; // default 5, used for menstrual window
+  /** Optional recorded end date per period start (start date -> end date). */
+  periodEnds?: Record<string, string>;
   /** Display name for the person whose cycle this is — "You" or her name */
   ownerLabel: string;
   /** Owner's IANA timezone, used by the LDR header */
@@ -54,4 +56,6 @@ export interface AppSettings {
   displayName?: string;
   age?: number;
   personalDetailsPromptSeen?: boolean;
+  /** Remind the user two days before the predicted period. */
+  periodReminders?: boolean;
 }
