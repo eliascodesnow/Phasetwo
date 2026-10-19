@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Download, LoaderCircle, MessageCircle, RotateCcw, Send, Trash2, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { MEDICAL_DISCLAIMER } from "../lib/endoContent";
+import { APPOINTMENT_DISCLAIMER, errorStatus } from "../lib/bellaClient";
 import { BELLA_OFFLINE_REFERENCES, findBellaOfflineReference } from "../lib/bellaOffline";
 
 type BellaSource = { title: string; organization: string; url: string };
@@ -27,7 +28,7 @@ function friendlyError(status?: number): string {
   return "Bella is temporarily unavailable. Please try again shortly.";
 }
 
-export function AskBellaLauncher() {
+export function AskBellaLauncher({ isAuthenticated, onSignIn }: { isAuthenticated: boolean; onSignIn?: () => void }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<BellaMessage[]>([]);
@@ -59,6 +60,13 @@ export function AskBellaLauncher() {
     setError("");
     setFailedMessage("");
 
+    if (!isAuthenticated) {
+      setError("Sign in to chat with Bella. Here is an offline reference in the meantime.");
+      const reference = findBellaOfflineReference(message);
+      if (reference) addOfflineResponse(reference);
+      return;
+    }
+
     if (!supabase) {
       setError("Bella is unavailable because secure sign-in is not configured.");
       setFailedMessage(message);
@@ -82,7 +90,7 @@ export function AskBellaLauncher() {
         },
       });
       if (invokeError) {
-        const status = "status" in invokeError ? Number(invokeError.status) : undefined;
+        const status = errorStatus(invokeError);
         allowOfflineFallback = status !== 401 && status !== 429;
         throw Object.assign(new Error(friendlyError(status)), { safeMessage: friendlyError(status) });
       }
@@ -92,7 +100,7 @@ export function AskBellaLauncher() {
         role: "assistant",
         text: data.text.trim(),
         sources: Array.isArray(data.sources) ? data.sources.filter((source) => source && /^https:\/\//.test(source.url)) : [],
-        appointmentSummary: /appointment|summary|doctor/i.test(message),
+        appointmentSummary: data.text.includes(APPOINTMENT_DISCLAIMER),
       };
       setMessages((current) => [...current, answer]);
     } catch (requestError) {
@@ -183,7 +191,7 @@ export function AskBellaLauncher() {
               </div>
             ))}
             {pending && <div className="flex items-center gap-2 text-sm text-zinc-500"><LoaderCircle className="h-4 w-4 animate-spin text-sage" />Bella is thinking…</div>}
-            {error && <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}{failedMessage && <button type="button" onClick={() => void sendMessage(failedMessage)} disabled={pending} className="ml-2 inline-flex items-center gap-1 font-medium underline underline-offset-2 disabled:opacity-50"><RotateCcw className="h-3 w-3" />Retry</button>}<p className="mt-2 border-t border-rose-200 pt-2 text-xs font-medium">Offline reference topics</p><div className="mt-1 flex flex-wrap gap-1.5">{BELLA_OFFLINE_REFERENCES.map((reference) => <button key={reference.id} type="button" onClick={() => showOfflineReference(reference.id)} className="rounded border border-rose-200 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-rose-50">{reference.title}</button>)}</div></div>}
+            {error && <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}{!isAuthenticated && onSignIn && <button type="button" onClick={onSignIn} className="ml-2 font-medium underline underline-offset-2">Sign in</button>}{failedMessage && <button type="button" onClick={() => void sendMessage(failedMessage)} disabled={pending} className="ml-2 inline-flex items-center gap-1 font-medium underline underline-offset-2 disabled:opacity-50"><RotateCcw className="h-3 w-3" />Retry</button>}<p className="mt-2 border-t border-rose-200 pt-2 text-xs font-medium">Offline reference topics</p><div className="mt-1 flex flex-wrap gap-1.5">{BELLA_OFFLINE_REFERENCES.map((reference) => <button key={reference.id} type="button" onClick={() => showOfflineReference(reference.id)} className="rounded border border-rose-200 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-rose-50">{reference.title}</button>)}</div></div>}
           </div>
 
           <div className="border-t border-zinc-200 bg-white px-4 py-3">
