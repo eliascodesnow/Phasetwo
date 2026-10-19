@@ -25,7 +25,7 @@ export async function loadSyncedAppState(userId: string): Promise<UserAppState> 
     appSettings: {
       role: data.app_settings?.role === "partner" ? "partner" : defaultSettings.role,
       ldrEnabled: Boolean(data.app_settings?.ldrEnabled),
-      themeMode: data.app_settings?.themeMode === "light" || data.app_settings?.themeMode === "dark"
+      themeMode: data.app_settings?.themeMode === "dark" || data.app_settings?.themeMode === "system"
         ? data.app_settings.themeMode
         : defaultSettings.themeMode,
       displayName: typeof data.app_settings?.displayName === "string" ? data.app_settings.displayName.trim().slice(0, 80) || undefined : undefined,

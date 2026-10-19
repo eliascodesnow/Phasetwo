@@ -37,7 +37,7 @@ export const defaultCycleProfile: CycleProfile = {
 export const defaultSettings: AppSettings = {
   role: "self",
   ldrEnabled: false,
-  themeMode: "system",
+  themeMode: "light",
 };
 
 export interface UserAppState {
@@ -59,7 +59,7 @@ export const storage = {
     return {
       role: saved.role === "partner" ? "partner" as const : "self" as const,
       ldrEnabled: Boolean(saved.ldrEnabled),
-      themeMode: saved.themeMode === "light" || saved.themeMode === "dark" ? saved.themeMode : "system",
+      themeMode: saved.themeMode === "dark" || saved.themeMode === "system" ? saved.themeMode : "light",
       displayName: typeof saved.displayName === "string" ? saved.displayName.trim().slice(0, 80) || undefined : undefined,
       age: Number.isInteger(saved.age) && Number(saved.age) >= 1 && Number(saved.age) <= 120 ? Number(saved.age) : undefined,
       personalDetailsPromptSeen: Boolean(saved.personalDetailsPromptSeen),
@@ -85,9 +85,9 @@ export function loadLocalAppState(userId: string): UserAppState {
       appSettings: {
         role: accountState.appSettings?.role === "partner" ? "partner" : "self",
         ldrEnabled: Boolean(accountState.appSettings?.ldrEnabled),
-        themeMode: accountState.appSettings?.themeMode === "light" || accountState.appSettings?.themeMode === "dark"
+        themeMode: accountState.appSettings?.themeMode === "dark" || accountState.appSettings?.themeMode === "system"
           ? accountState.appSettings.themeMode
-          : "system",
+          : "light",
         displayName: typeof accountState.appSettings?.displayName === "string" ? accountState.appSettings.displayName.trim().slice(0, 80) || undefined : undefined,
         age: Number.isInteger(accountState.appSettings?.age) && Number(accountState.appSettings.age) >= 1 && Number(accountState.appSettings.age) <= 120
           ? Number(accountState.appSettings.age)

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { CalendarDays, Cloud, FileText, HeartPulse, Home, ListTodo, LogOut, Leaf, LogIn, MoreHorizontal, Settings, ShieldCheck } from "lucide-react";
+import { CalendarDays, FileText, HeartPulse, Home, ListTodo, LogOut, Leaf, LogIn, MoreHorizontal, Settings, ShieldCheck } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
 import { defaultCycleProfile, defaultSettings } from "./lib/storage";
 import { CycleHeader } from "./components/CycleHeader";
+import { GoogleLogo } from "./components/GoogleLogo";
 import { TaskPlanner } from "./components/TaskPlanner";
 import { LDRModule } from "./components/LDRModule";
 import { SymptomLogger, type SymptomLoggerSaveRef } from "./components/SymptomLogger";
@@ -59,7 +60,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [loginBusy, setLoginBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("dark");
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
   const [moreOpen, setMoreOpen] = useState(false);
   const [focusCheckin, setFocusCheckin] = useState(false);
   const [detailsName, setDetailsName] = useState("");
@@ -69,7 +70,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const symptomSaveAction = useRef<SymptomLoggerSaveRef["current"]>(null);
 
   useEffect(() => {
-    const mode = settings.themeMode ?? "system";
+    const mode = settings.themeMode ?? "light";
     const media = window.matchMedia("(prefers-color-scheme: light)");
     const applyTheme = () => {
       const theme = mode === "system" ? (media.matches ? "light" : "dark") : mode;
@@ -340,7 +341,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           <p className="mt-4 text-sm leading-6 text-zinc-600">Use your account to sync cycle data across devices and keep your weekly streak going.</p>
           <div className="mt-5 space-y-3">
             <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">
-              <Cloud className="h-4 w-4" strokeWidth={2} />
+              <GoogleLogo className="h-5 w-5" />
               Continue with Google
             </button>
             <form className="space-y-3" onSubmit={(event) => void handleEmailSignIn(event)}>
@@ -371,10 +372,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           </div>}
           <PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} />
           {settings.role === "self" && <SymptomLogger profile={profile} userId={userId} initialLogDate={editingLogDate} onHistoryChange={setSymptomLogs} saveActionRef={symptomSaveAction} />}
-          <div className="grid grid-cols-1 gap-6 items-start lg:grid-cols-2">
-            <TaskPlanner profile={displayedProfile} tasks={tasks} onChange={setTasks} />
-            {showLdr && <LDRModule profile={displayedProfile} selfTimezone={SELF_TIMEZONE} />}
-          </div>
           {showLdr && <LDRModule profile={displayedProfile} selfTimezone={SELF_TIMEZONE} />}
           {settings.role === "self" && <EndometriosisAwareness logs={symptomLogs} profile={profile} />}
         </>}

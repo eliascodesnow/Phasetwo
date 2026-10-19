@@ -46,7 +46,7 @@ describe("account-scoped app state", () => {
     expect(loadLocalAppState("account-two").cycleProfile.ownerLabel).toBe("Second account");
   });
 
-  it("persists theme mode per account and defaults older snapshots to system", () => {
+  it("persists theme mode per account and defaults older snapshots to light", () => {
     const account = loadLocalAppState("theme-account");
     account.appSettings.themeMode = "dark";
     saveLocalAppState("theme-account", account);
@@ -58,7 +58,7 @@ describe("account-scoped app state", () => {
       appSettings: { role: "self", ldrEnabled: false },
       chatMessages: [],
     }));
-    expect(loadLocalAppState("older-account").appSettings.themeMode).toBe("system");
+    expect(loadLocalAppState("older-account").appSettings.themeMode).toBe("light");
   });
 
   it("persists optional personal details and normalizes invalid ages", () => {
