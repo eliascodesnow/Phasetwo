@@ -54,4 +54,6 @@ export interface AppSettings {
   displayName?: string;
   age?: number;
   personalDetailsPromptSeen?: boolean;
+  /** Notify 2 days and 1 day before the predicted period. */
+  periodReminders?: boolean;
 }
