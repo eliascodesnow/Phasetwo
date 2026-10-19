@@ -45,3 +45,85 @@ export function mapPartnerInviteError(code: string | null | undefined): string {
       return "We couldn’t create that invitation. Please try again.";
   }
 }
+
+const KNOWN_ACCEPT_ERRORS = new Set<string>([
+  "invalid_or_expired_code",
+  "cannot_accept_own_invite",
+  "already_linked",
+  "already_linked_partner",
+  "not_authenticated",
+]);
+
+/** Friendly message for a failed accept_cycle_invitation call (the RPC raises the code as its message). */
+export function mapPartnerAcceptError(code: string | null | undefined): string {
+  return code && KNOWN_ACCEPT_ERRORS.has(code)
+    ? mapPartnerInviteError(code)
+    : "That invite code could not be accepted. Please try again.";
+}
+
+const PENDING_CODE_KEY = "phasetwo:pending-partner-code";
+const PENDING_CODE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+type CodeStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+/** Returns a formatted ABCD-EFGH code from a URL parameter, or null if it is not a valid code. */
+export function parsePartnerCodeParam(value: string | null | undefined): string | null {
+  const normalized = (value ?? "").replace(/[\s-]/g, "").toUpperCase();
+  return /^[A-Z0-9]{8}$/.test(normalized) ? formatInviteCode(normalized) : null;
+}
+
+export function stashPendingPartnerCode(code: string, storage: CodeStorage | null, now = Date.now()): void {
+  try {
+    storage?.setItem(PENDING_CODE_KEY, JSON.stringify({ code, savedAt: now }));
+  } catch {
+    // Storage can be unavailable (private mode); the user can still type the code.
+  }
+}
+
+export function readPendingPartnerCode(storage: CodeStorage | null, now = Date.now()): string | null {
+  try {
+    const raw = storage?.getItem(PENDING_CODE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { code?: unknown; savedAt?: unknown };
+    const code = typeof parsed.code === "string" ? parsePartnerCodeParam(parsed.code) : null;
+    if (!code || typeof parsed.savedAt !== "number" || now - parsed.savedAt > PENDING_CODE_TTL_MS) {
+      storage?.removeItem(PENDING_CODE_KEY);
+      return null;
+    }
+    return code;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingPartnerCode(storage: CodeStorage | null): void {
+  try {
+    storage?.removeItem(PENDING_CODE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function browserStorage(): CodeStorage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** Called once on load: moves ?partnerCode=… from the URL into storage so it survives sign-in. */
+export function capturePartnerCodeFromUrl(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("partnerCode")) return;
+  const code = parsePartnerCodeParam(url.searchParams.get("partnerCode"));
+  if (code) stashPendingPartnerCode(code, browserStorage());
+  url.searchParams.delete("partnerCode");
+  window.history.replaceState({}, "", url);
+}
+
+export const pendingPartnerCode = {
+  peek: () => readPendingPartnerCode(browserStorage()),
+  clear: () => clearPendingPartnerCode(browserStorage()),
+};

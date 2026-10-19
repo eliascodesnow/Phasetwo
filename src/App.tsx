@@ -20,6 +20,7 @@ import { supabase } from "./lib/supabase";
 import { clearLocalUserData, LOCAL_GUEST_ID, loadLocalAppState, saveLocalAppState, type UserAppState } from "./lib/storage";
 import { loadSyncedAppState, saveSyncedAppState } from "./lib/userData";
 import { recordPeriodStart } from "./lib/cycleUtils";
+import { pendingPartnerCode } from "./lib/partnerInvite";
 import { sendDueReminder } from "./lib/notifications";
 import type { SymptomLog } from "./lib/symptoms";
 import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
@@ -55,6 +56,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [editingLogDate, setEditingLogDate] = useState<string | undefined>();
   const [appReady, setAppReady] = useState(false);
   const [syncError, setSyncError] = useState("");
+  const [incomingPartnerCode, setIncomingPartnerCode] = useState<string | null>(null);
   const [loginError, setLoginError] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
@@ -83,6 +85,21 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       return () => media.removeEventListener("change", applyTheme);
     }
   }, [settings.themeMode]);
+
+  useEffect(() => {
+    if (!appReady) return;
+    const code = pendingPartnerCode.peek();
+    if (!code) return;
+    if (isAuthenticated) {
+      // Open "Enter a partner code" with the emailed code prefilled; the person still confirms it.
+      pendingPartnerCode.clear();
+      setIncomingPartnerCode(code);
+      setActiveView("settings");
+    } else if (supabase) {
+      setLoginMessage("Sign in to accept your partner’s invitation. Your code will be ready afterwards.");
+      setActiveView("login");
+    }
+  }, [appReady, isAuthenticated]);
 
   const reminderProfile = settings.role === "partner" && sharedCycleProfile ? sharedCycleProfile : profile;
   useEffect(() => {
@@ -382,7 +399,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
         {activeView === "history" && <HistoryView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("today"); }} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
         {activeView === "report" && <ReportView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} displayName={settings.displayName} age={settings.age} />}
-        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
+        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} initialPartnerCode={incomingPartnerCode} onInitialPartnerCodeUsed={() => setIncomingPartnerCode(null)} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
 
       </main>
 
