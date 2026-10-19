@@ -6,6 +6,7 @@ import { editPeriodStart } from "../lib/cycleUtils";
 import { supabase } from "../lib/supabase";
 import { PartnerInvitationPanel } from "./PartnerInvitationPanel";
 import { SaveChangesButton } from "./SaveChangesButton";
+import { enableReminders, reminderSupport, type ReminderSupport } from "../lib/notifications";
 
 export function SettingsView({
   settings,
@@ -44,6 +45,14 @@ export function SettingsView({
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState("");
   const [linkNotice, setLinkNotice] = useState("");
+  const [reminderPermission, setReminderPermission] = useState<ReminderSupport>(reminderSupport());
+
+  async function toggleReminders(on: boolean) {
+    if (!on) return onSettingsChange({ ...settings, periodReminders: false });
+    const permission = await enableReminders();
+    setReminderPermission(permission);
+    onSettingsChange({ ...settings, periodReminders: permission === "granted" });
+  }
 
   async function deleteAccount() {
     if (confirmation !== "DELETE") return;
@@ -80,6 +89,22 @@ export function SettingsView({
               </button>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="border-b border-zinc-200 pb-5" aria-labelledby="reminders-heading">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="max-w-md">
+            <h2 id="reminders-heading" className="font-display text-base font-semibold text-zinc-900">Period reminders</h2>
+            <p className="mt-1 text-sm text-zinc-500">Get a notification 2 days and 1 day before your predicted period. Reminders appear when PhaseTwo is installed or open on this device.</p>
+            {reminderPermission === "denied" && <p role="alert" className="mt-1 text-xs text-rose-700">Notifications are blocked for this site. Allow them in your browser settings, then turn this on.</p>}
+            {reminderPermission === "unsupported" && <p className="mt-1 text-xs text-zinc-500">This browser does not support notifications.</p>}
+          </div>
+          <button type="button" role="switch" aria-checked={Boolean(settings.periodReminders)} disabled={reminderPermission === "unsupported"}
+            onClick={() => void toggleReminders(!settings.periodReminders)}
+            className={`min-h-10 rounded-md border px-3 text-sm font-medium disabled:opacity-50 ${settings.periodReminders ? "border-sage bg-sage-light/50 text-zinc-900" : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"}`}>
+            {settings.periodReminders ? "On" : "Off"}
+          </button>
         </div>
       </section>
 

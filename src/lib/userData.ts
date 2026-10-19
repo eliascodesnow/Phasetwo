@@ -33,6 +33,7 @@ export async function loadSyncedAppState(userId: string): Promise<UserAppState> 
         ? Number(data.app_settings.age)
         : undefined,
       personalDetailsPromptSeen: Boolean(data.app_settings?.personalDetailsPromptSeen),
+      periodReminders: Boolean(data.app_settings?.periodReminders),
     },
     chatMessages: data.chat_messages ?? [],
   };

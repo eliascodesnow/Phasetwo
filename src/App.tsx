@@ -18,6 +18,7 @@ import { supabase } from "./lib/supabase";
 import { clearLocalUserData, LOCAL_GUEST_ID, loadLocalAppState, saveLocalAppState, type UserAppState } from "./lib/storage";
 import { loadSyncedAppState, saveSyncedAppState } from "./lib/userData";
 import { recordPeriodStart } from "./lib/cycleUtils";
+import { sendDueReminder } from "./lib/notifications";
 import type { SymptomLog } from "./lib/symptoms";
 import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
 import { CommunityView } from "./components/CommunityView";
@@ -83,6 +84,16 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       return () => media.removeEventListener("change", applyTheme);
     }
   }, [settings.themeMode]);
+
+  const reminderProfile = settings.role === "partner" && sharedCycleProfile ? sharedCycleProfile : profile;
+  useEffect(() => {
+    if (!appReady || !settings.periodReminders) return;
+    const check = () => { void sendDueReminder(reminderProfile); };
+    check();
+    const timer = window.setInterval(check, 60 * 60 * 1000);
+    document.addEventListener("visibilitychange", check);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", check); };
+  }, [appReady, settings.periodReminders, reminderProfile]);
 
   useEffect(() => {
     if (!focusCheckin || activeView !== "today") return;

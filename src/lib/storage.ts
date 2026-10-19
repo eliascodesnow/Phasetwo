@@ -63,6 +63,7 @@ export const storage = {
       displayName: typeof saved.displayName === "string" ? saved.displayName.trim().slice(0, 80) || undefined : undefined,
       age: Number.isInteger(saved.age) && Number(saved.age) >= 1 && Number(saved.age) <= 120 ? Number(saved.age) : undefined,
       personalDetailsPromptSeen: Boolean(saved.personalDetailsPromptSeen),
+      periodReminders: Boolean(saved.periodReminders),
     };
   },
   saveSettings: (v: AppSettings) => write(KEYS.settings, v),
