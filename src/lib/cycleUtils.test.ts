@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classifyDay } from "../components/PeriodCalendar";
-import { calculateWeeklyPeriodStreak, editPeriodStart, recordPeriodStart, removePeriodStart } from "./cycleUtils";
+import { calculateWeeklyPeriodStreak, editPeriodStart, energyAtCycleFraction, recordPeriodStart, removePeriodStart } from "./cycleUtils";
 
 describe("period start tracking", () => {
   const profile = {
@@ -88,5 +88,17 @@ describe("period start tracking", () => {
     expect(result.goal).toBe(7);
     expect(result.active).toBe(true);
     expect(result.message).toContain("5-day streak");
+  });
+
+  it("keeps the energy curve in range, peaking mid-cycle and low at the ends", () => {
+    for (let i = 0; i <= 100; i += 1) {
+      const value = energyAtCycleFraction(i / 100);
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThanOrEqual(1);
+    }
+    expect(energyAtCycleFraction(0.5)).toBeGreaterThan(energyAtCycleFraction(0));
+    expect(energyAtCycleFraction(0.5)).toBeGreaterThan(energyAtCycleFraction(0.9));
+    expect(energyAtCycleFraction(-1)).toBe(energyAtCycleFraction(0));
+    expect(energyAtCycleFraction(2)).toBe(energyAtCycleFraction(1));
   });
 });

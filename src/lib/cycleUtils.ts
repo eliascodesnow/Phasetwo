@@ -103,6 +103,27 @@ function withPeriodStarts(profile: CycleProfile, values: string[]): CycleProfile
   };
 }
 
+/**
+ * Relative energy (0 to 1) at a point in the cycle, where `fraction` runs from 0 (first day)
+ * to 1 (the day before the next period). A smooth illustration, not a measurement.
+ */
+export function energyAtCycleFraction(fraction: number): number {
+  const keys: Array<[number, number]> = [
+    [0, 0.2], [0.18, 0.28], [0.35, 0.7], [0.5, 0.95], [0.6, 0.72], [0.75, 0.5], [0.9, 0.34], [1, 0.2],
+  ];
+  const f = Math.min(1, Math.max(0, fraction));
+  for (let i = 1; i < keys.length; i += 1) {
+    const [x1, y1] = keys[i];
+    if (f <= x1) {
+      const [x0, y0] = keys[i - 1];
+      const t = (f - x0) / (x1 - x0);
+      const eased = (1 - Math.cos(t * Math.PI)) / 2;
+      return y0 + (y1 - y0) * eased;
+    }
+  }
+  return keys[keys.length - 1][1];
+}
+
 export function cycleProgressPercent(profile: CycleProfile, asOf: Date = new Date()): number {
   const day = currentCycleDay(profile, asOf);
   return Math.round((day / (profile.cycleLength || 28)) * 100);
