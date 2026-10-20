@@ -406,19 +406,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         {syncError && <span role="status" className="ml-2 text-red-700">Sync issue: {syncError}</span>}
       </footer>
 
-      {activeView !== "login" && <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 backdrop-blur sm:hidden">
-        <ul className="pb-safe mx-auto grid max-w-md grid-cols-4">
-          {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
-            <li key={key}>
-              <button type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "today") setEditingLogDate(undefined); setActiveView(key); window.scrollTo({ top: 0 }); }} className={`flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${activeView === key ? "text-sage-dark" : "text-zinc-500"}`}>
-                <span className={`flex h-7 w-12 items-center justify-center rounded-full transition-colors ${activeView === key ? "bg-sage-light" : ""}`}><Icon className="h-5 w-5" strokeWidth={1.8} /></span>
-                {label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </nav>}
-
       {settings.role === "self" && <AskBellaLauncher isAuthenticated={isAuthenticated} onSignIn={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} />}
       {showLdr && <PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} />}
 
@@ -457,7 +444,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       </div>}
 
       {activeView !== "login" && <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-base px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-        <div className={`mx-auto grid max-w-lg grid-cols-4`}>
+        <div className="mx-auto grid max-w-lg grid-cols-5">
           {[
             { key: "today" as const, label: "Today", icon: Home },
             { key: "calendar" as const, label: "Calendar", icon: CalendarDays },
