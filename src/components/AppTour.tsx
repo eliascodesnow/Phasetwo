@@ -199,7 +199,7 @@ export function AppTour({
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
         style={{
-          background: "linear-gradient(165deg, rgb(150 70 98 / 0.16) 0%, rgb(44 30 41 / 0.30) 100%)",
+          background: "var(--tour-wash)",
           clipPath: hasHole && hole ? spotlightClipPath(hole, SPOTLIGHT_RADIUS) : undefined,
         }}
       />

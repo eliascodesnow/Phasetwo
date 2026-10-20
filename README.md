@@ -157,5 +157,5 @@ npm run preview
 ```
 
 `npm run build` outputs static files to `dist/` that you can host anywhere
-(Vercel, Netlify, GitHub Pages, etc.). Configure the Supabase environment values
+(PhaseTwo is deployed on Vercel). Configure the Supabase environment values
 and production redirect URL in the hosting provider before deploying.

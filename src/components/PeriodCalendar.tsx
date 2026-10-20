@@ -124,7 +124,7 @@ function MonthGrid({
               ? "border border-dashed border-[var(--period-line)] bg-[var(--period-soft)] text-[var(--period-solid)]"
               : "text-zinc-700 hover:bg-zinc-100";
           return (
-            <div key={key} className="flex justify-center">
+            <div key={key} className="flex min-w-0 justify-center">
               <button
                 id={`calendar-day-${key}`}
                 type="button"

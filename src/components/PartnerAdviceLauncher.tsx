@@ -60,9 +60,9 @@ export function PartnerAdviceLauncher({
   const phase = phaseForDay(day, profile.cycleLength);
 
   return (
-    <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 z-40 print:hidden lg:bottom-4">
+    <div className="fixed z-40 print:hidden" style={{ left: "max(1rem, env(safe-area-inset-left, 0px))", bottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}>
       {open && <div className="fixed inset-0 z-40 bg-zinc-950/20" onClick={() => setOpen(false)} />}
-      {open && <section role="dialog" aria-modal="true" aria-labelledby="partner-advice-title" className="absolute bottom-14 left-0 z-50 flex max-h-[min(78vh,760px)] w-[min(420px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-xl border border-zinc-200 bg-[#fbf7f5] p-3 shadow-xl sm:p-4">
+      {open && <section role="dialog" aria-modal="true" aria-labelledby="partner-advice-title" className="absolute bottom-14 left-0 z-50 flex max-h-[min(78vh,760px)] w-[min(420px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-xl border border-zinc-200 bg-zinc-50 p-3 shadow-xl sm:p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2"><HeartHandshake className="h-4 w-4 text-sage" /><h2 id="partner-advice-title" className="font-display text-base font-semibold text-zinc-900">Partner advice</h2></div>
           <button type="button" onClick={() => setOpen(false)} aria-label="Close partner advice" className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100"><X className="h-4 w-4" /></button>

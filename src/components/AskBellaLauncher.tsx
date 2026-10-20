@@ -154,10 +154,10 @@ export function AskBellaLauncher({ isAuthenticated, onSignIn }: { isAuthenticate
   }
 
   return (
-    <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 print:hidden lg:bottom-6 lg:right-6">
+    <div className="fixed z-40 print:hidden" style={{ right: "max(1rem, env(safe-area-inset-right, 0px))", bottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}>
       {open && <button type="button" aria-label="Close Ask Bella" onClick={() => setOpen(false)} className="fixed inset-0 z-40 cursor-default bg-zinc-950/20 sm:bg-transparent" />}
       {open && (
-        <section role="dialog" aria-modal="true" aria-labelledby="ask-bella-title" className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-3 z-50 flex h-[min(720px,calc(100dvh-6rem-env(safe-area-inset-bottom)))] w-[min(440px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-[#fcfbf9] shadow-2xl lg:bottom-24 lg:right-6 lg:h-[min(720px,calc(100dvh-6.5rem))]">
+        <section role="dialog" aria-modal="true" aria-labelledby="ask-bella-title" className="fixed z-50 flex h-[min(720px,calc(100dvh-7.5rem))] w-[min(440px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-surface shadow-2xl" style={{ right: "max(0.75rem, env(safe-area-inset-right, 0px))", bottom: "calc(max(1rem, env(safe-area-inset-bottom, 0px)) + 4.5rem)" }}>
           <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3.5">
             <div className="min-w-0">
               <div className="min-w-0">
@@ -203,9 +203,18 @@ export function AskBellaLauncher({ isAuthenticated, onSignIn }: { isAuthenticate
           </div>
         </section>
       )}
-      <button type="button" data-tour="ask-bella" aria-expanded={open} aria-label="Ask Bella" onClick={() => setOpen((current) => !current)} className="inline-flex min-h-12 items-center gap-2 rounded-full border border-[#416353]/20 bg-white px-4 py-1.5 text-sm font-semibold text-zinc-900 shadow-lg transition-transform hover:-translate-y-0.5 hover:shadow-xl">
-        Ask Bella
-        <MessageCircle className="h-4 w-4 text-sage" />
+      <button
+        type="button"
+        data-tour="ask-bella"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-label="Ask Bella"
+        title="Ask Bella"
+        onClick={() => setOpen((current) => !current)}
+        className="inline-flex h-14 w-14 items-center justify-center gap-2 rounded-full bg-sage text-sm font-semibold text-white shadow-lg ring-1 ring-black/5 transition-transform hover:-translate-y-0.5 hover:shadow-xl sm:h-12 sm:w-auto sm:px-5"
+      >
+        <MessageCircle className="h-6 w-6 sm:h-4 sm:w-4" strokeWidth={2} />
+        <span className="hidden sm:inline">Ask Bella</span>
       </button>
     </div>
   );
