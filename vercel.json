@@ -2,5 +2,18 @@
   "buildCommand": "npm install-scripts approve esbuild && npm run build",
   "env": {
     "npm_config_allow_scripts": "true"
-  }
+  },
+  "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/privacy-policy",
+      "destination": "/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/terms-of-service",
+      "destination": "/terms",
+      "permanent": true
+    }
+  ]
 }
