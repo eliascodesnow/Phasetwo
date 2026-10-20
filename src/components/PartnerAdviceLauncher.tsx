@@ -79,7 +79,7 @@ export function PartnerAdviceLauncher({
         </section>
         <AIAssistant profile={profile} role="partner" messages={messages} onChange={onMessagesChange} ldrEnabled={false} />
       </section>}
-      <button type="button" aria-expanded={open} onClick={() => setOpen((current) => !current)} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#b96070] px-4 py-3 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[#a95263]">
+      <button type="button" data-tour="partner-advice" aria-expanded={open} onClick={() => setOpen((current) => !current)} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#b96070] px-4 py-3 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-[#a95263]">
         <MessageCircle className="h-4 w-4" />Partner advice
       </button>
     </div>

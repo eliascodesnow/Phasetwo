@@ -35,7 +35,7 @@ export function LDRModule({
   const ideas = isLowEnergyPhase(phase.key) ? LOW_ENERGY_DATES : HIGH_ENERGY_DATES;
 
   return (
-    <section className="bg-white border border-zinc-200 rounded-xl shadow-card p-6 sm:p-8">
+    <section data-tour="ldr" className="bg-white border border-zinc-200 rounded-xl shadow-card p-6 sm:p-8">
       <h3 className="font-display text-lg font-semibold text-zinc-900">Remote sync</h3>
 
       {/* Unified timezone + phase bar */}

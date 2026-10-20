@@ -64,6 +64,7 @@ export const storage = {
       age: Number.isInteger(saved.age) && Number(saved.age) >= 1 && Number(saved.age) <= 120 ? Number(saved.age) : undefined,
       personalDetailsPromptSeen: Boolean(saved.personalDetailsPromptSeen),
       periodReminders: Boolean(saved.periodReminders),
+      tourCompleted: Boolean(saved.tourCompleted),
     };
   },
   saveSettings: (v: AppSettings) => write(KEYS.settings, v),
@@ -93,6 +94,7 @@ export function loadLocalAppState(userId: string): UserAppState {
           ? Number(accountState.appSettings.age)
           : undefined,
         personalDetailsPromptSeen: Boolean(accountState.appSettings?.personalDetailsPromptSeen),
+        tourCompleted: Boolean(accountState.appSettings?.tourCompleted),
       },
       chatMessages: accountState.chatMessages ?? [],
     };

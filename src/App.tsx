@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
 import { CalendarDays, FileText, HeartPulse, Home, ListTodo, LogOut, Leaf, LogIn, MoreHorizontal, Settings, ShieldCheck } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
@@ -26,6 +26,9 @@ import { pendingPartnerCode } from "./lib/partnerInvite";
 import { sendDueReminder } from "./lib/notifications";
 import type { SymptomLog } from "./lib/symptoms";
 import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
+
+// Loaded on demand: the tour is shown once per person, so it should not weigh down the main bundle.
+const AppTour = lazy(() => import("./components/AppTour").then((module) => ({ default: module.AppTour })));
 
 const SELF_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 type WorkspaceView = "today" | "calendar" | "planner" | "history" | "report" | "settings" | "login";
@@ -78,6 +81,9 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const tourStartView = useRef<WorkspaceView>("today");
+  const tourAutoHandled = useRef(false);
   const [focusCheckin, setFocusCheckin] = useState(false);
   const [detailsName, setDetailsName] = useState("");
   const [detailsAge, setDetailsAge] = useState("");
@@ -114,6 +120,31 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       setActiveView("login");
     }
   }, [appReady, isAuthenticated]);
+
+  // Open the tour once for anyone who has not seen it: signed-in users right away, guests after the
+  // optional details prompt is out of the way. A pending partner invitation takes priority.
+  useEffect(() => {
+    if (!appReady || tourAutoHandled.current || activeView === "login" || incomingPartnerCode) return;
+    if (settings.tourCompleted) { tourAutoHandled.current = true; return; }
+    if (isAuthenticated || settings.personalDetailsPromptSeen) {
+      tourAutoHandled.current = true;
+      tourStartView.current = "today";
+      setTourOpen(true);
+    }
+  }, [appReady, activeView, incomingPartnerCode, isAuthenticated, settings.tourCompleted, settings.personalDetailsPromptSeen]);
+
+  function startTour() {
+    tourStartView.current = activeView;
+    setMoreOpen(false);
+    setTourOpen(true);
+  }
+
+  function closeTour() {
+    setTourOpen(false);
+    setSettings((current) => current.tourCompleted ? current : { ...current, tourCompleted: true });
+    setActiveView(tourStartView.current);
+    window.scrollTo({ top: 0 });
+  }
 
   const reminderProfile = settings.role === "partner" && sharedCycleProfile ? sharedCycleProfile : profile;
   useEffect(() => {
@@ -336,9 +367,9 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
               PhaseTwo
             </span>
           </div>
-          {activeView !== "login" && <nav aria-label="Main navigation" className="order-3 flex w-full items-center gap-1 overflow-x-auto sm:order-2 sm:w-auto">
+          {activeView !== "login" && <nav aria-label="Main navigation" data-tour="nav" className="order-3 flex w-full items-center gap-1 overflow-x-auto sm:order-2 sm:w-auto">
             {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
-              <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "today") setEditingLogDate(undefined); setActiveView(key); }} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
+              <button key={key} type="button" data-tour={`tab-${key}`} aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "today") setEditingLogDate(undefined); setActiveView(key); }} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
                 <Icon className="h-4 w-4" strokeWidth={1.8} />{label}
               </button>
             ))}
@@ -392,7 +423,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         {activeView === "today" && <>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="text-sm font-medium text-sage-dark">{new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date())}</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Today</h1>{settings.displayName && <p className="mt-1 text-sm text-zinc-600">Hello, {settings.displayName}</p>}</div>
-            {settings.role === "self" && <button type="button" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-sage/40 px-4 text-sm font-semibold text-sage-dark transition-colors hover:bg-sage-light"><HeartPulse className="h-4 w-4" />Period started</button>}
+            {settings.role === "self" && <button type="button" data-tour="record-period" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-sage/40 px-4 text-sm font-semibold text-sage-dark transition-colors hover:bg-sage-light"><HeartPulse className="h-4 w-4" />Period started</button>}
           </div>
           <CycleHeader profile={displayedProfile} />
           {settings.role === "self" && isAuthenticated && <WeeklyStreakCard weeks={weeklyLoginStreak} />}
@@ -413,7 +444,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
         {activeView === "history" && <HistoryView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("today"); }} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
         {activeView === "report" && <ReportView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} displayName={settings.displayName} age={settings.age} />}
-        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} initialPartnerCode={incomingPartnerCode} onInitialPartnerCodeUsed={() => setIncomingPartnerCode(null)} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
+        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} initialPartnerCode={incomingPartnerCode} onInitialPartnerCodeUsed={() => setIncomingPartnerCode(null)} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} onStartTour={startTour} />}
 
       </main>
 
@@ -422,6 +453,8 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         <span className="ml-2 whitespace-nowrap"><a href={PRIVACY_URL} className="underline underline-offset-2 hover:text-zinc-600">Privacy Policy</a> · <a href={TERMS_URL} className="underline underline-offset-2 hover:text-zinc-600">Terms of Service</a></span>
         {syncError && <span role="status" className="ml-2 text-red-700">Sync issue: {syncError}</span>}
       </footer>
+
+      {tourOpen && <Suspense fallback={null}><AppTour role={settings.role} onNavigate={(view) => { setActiveView(view); window.scrollTo({ top: 0 }); }} onClose={closeTour} /></Suspense>}
 
       {settings.role === "self" && <AskBellaLauncher isAuthenticated={isAuthenticated} onSignIn={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} />}
       {showLdr && <PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} />}
