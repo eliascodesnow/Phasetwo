@@ -176,6 +176,7 @@ export function SettingsView({
             <h2 className="font-display text-base font-semibold text-zinc-900">Privacy and care</h2>
             <p className="mt-3 text-xs leading-relaxed text-zinc-600">Symptom history is private to your account. An accepted partner invitation shares only cycle dates and length. Delete symptom entries from Home or History.</p>
             <p className="mt-3 text-xs leading-relaxed text-zinc-500">{MEDICAL_DISCLAIMER}</p>
+            <p className="mt-3 flex gap-4 text-xs"><a href="/privacy" target="_blank" rel="noreferrer" className="font-medium text-sage underline underline-offset-2">Privacy Policy</a><a href="/terms" target="_blank" rel="noreferrer" className="font-medium text-sage underline underline-offset-2">Terms of Service</a></p>
           </section>
         </div>
       </div>

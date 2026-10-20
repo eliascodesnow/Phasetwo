@@ -2,5 +2,7 @@
   "buildCommand": "npm install-scripts approve esbuild && npm run build",
   "env": {
     "npm_config_allow_scripts": "true"
-  }
+  },
+  "cleanUrls": true,
+  "trailingSlash": false
 }
