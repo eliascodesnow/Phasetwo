@@ -435,7 +435,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
       {tourOpen && <AppTour role={settings.role} onNavigate={(view) => { setMoreOpen(false); setActiveView(view); window.scrollTo({ top: 0 }); }} onClose={closeTour} />}
 
-      {settings.role === "self" && <AskBellaLauncher />}
+      {settings.role === "self" && <AskBellaLauncher isAuthenticated={isAuthenticated} onSignIn={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} />}
       {showLdr && <PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} />}
 
       {!isAuthenticated && !settings.personalDetailsPromptSeen && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/70 p-4 backdrop-blur-sm">

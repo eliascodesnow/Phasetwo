@@ -127,7 +127,7 @@ async function callOpenRouter(model: string, apiKey: string, messages: OpenRoute
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://phasetwo.app",
+        "HTTP-Referer": "https://phasetwo.space",
         "X-Title": "PhaseTwo Ask Bella",
       },
       body: JSON.stringify({ model, messages, max_tokens: 800, temperature: 0.35 }),
@@ -217,8 +217,7 @@ Deno.serve(async (request: Request) => {
     const responseText = appointmentRequest && !text.includes(appointmentDisclaimer)
       ? `${text}\n\n${appointmentDisclaimer}`
       : text;
-    const sources = needsBellaSources(message) ? BELLA_RESOURCES : [];
-      const sources = needsBellaSources(message) ? getBellaResources(message) : [];
+    const sources = needsBellaSources(message) ? getBellaResources(message) : [];
     log(200, "success");
     return json(request, 200, { text: responseText, sources });
   } catch (error) {
