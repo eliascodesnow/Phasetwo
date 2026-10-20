@@ -28,8 +28,11 @@ function friendlyError(status?: number): string {
   return "Bella is temporarily unavailable. Please try again shortly.";
 }
 
+import { useScrollLock } from "../lib/scrollLock";
+
 export function AskBellaLauncher({ isAuthenticated, onSignIn }: { isAuthenticated: boolean; onSignIn?: () => void }) {
   const [open, setOpen] = useState(false);
+  useScrollLock(open);
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<BellaMessage[]>([]);
   const [pending, setPending] = useState(false);
@@ -155,7 +158,7 @@ export function AskBellaLauncher({ isAuthenticated, onSignIn }: { isAuthenticate
 
   return (
     <div className="fixed z-40 print:hidden" style={{ right: "max(1rem, env(safe-area-inset-right, 0px))", bottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}>
-      {open && <button type="button" aria-label="Close Ask Bella" onClick={() => setOpen(false)} className="fixed inset-0 z-40 cursor-default bg-zinc-950/20 sm:bg-transparent" />}
+      {open && <button type="button" aria-label="Close Ask Bella" onClick={() => setOpen(false)} className="fixed inset-0 z-40 cursor-default bg-zinc-950/45 backdrop-blur-[2px]" />}
       {open && (
         <section role="dialog" aria-modal="true" aria-labelledby="ask-bella-title" className="fixed z-50 flex h-[min(720px,calc(100dvh-7.5rem))] w-[min(440px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-surface shadow-2xl" style={{ right: "max(0.75rem, env(safe-area-inset-right, 0px))", bottom: "calc(max(1rem, env(safe-area-inset-bottom, 0px)) + 4.5rem)" }}>
           <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3.5">
@@ -171,7 +174,7 @@ export function AskBellaLauncher({ isAuthenticated, onSignIn }: { isAuthenticate
             </div>
           </header>
 
-          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4" aria-live="polite">
+          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4" aria-live="polite">
             {messages.length === 0 && (
               <div className="space-y-4">
                 <p className="text-sm leading-relaxed text-zinc-700">Hi, I’m Bella. I can share menstrual-health education, help make sense of patterns you’ve recorded, and help you prepare for a healthcare appointment.</p>
@@ -191,7 +194,7 @@ export function AskBellaLauncher({ isAuthenticated, onSignIn }: { isAuthenticate
               </div>
             ))}
             {pending && <div className="flex items-center gap-2 text-sm text-zinc-500"><LoaderCircle className="h-4 w-4 animate-spin text-sage" />Bella is thinking…</div>}
-            {error && <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}{!isAuthenticated && onSignIn && <button type="button" onClick={onSignIn} className="ml-2 font-medium underline underline-offset-2">Sign in</button>}{failedMessage && <button type="button" onClick={() => void sendMessage(failedMessage)} disabled={pending} className="ml-2 inline-flex items-center gap-1 font-medium underline underline-offset-2 disabled:opacity-50"><RotateCcw className="h-3 w-3" />Retry</button>}<p className="mt-2 border-t border-rose-200 pt-2 text-xs font-medium">Offline reference topics</p><div className="mt-1 flex flex-wrap gap-1.5">{BELLA_OFFLINE_REFERENCES.map((reference) => <button key={reference.id} type="button" onClick={() => showOfflineReference(reference.id)} className="rounded border border-rose-200 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-rose-50">{reference.title}</button>)}</div></div>}
+            {error && <div role="alert" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}{!isAuthenticated && onSignIn && <button type="button" onClick={() => { setOpen(false); onSignIn(); }} className="ml-2 font-medium underline underline-offset-2">Sign in</button>}{failedMessage && <button type="button" onClick={() => void sendMessage(failedMessage)} disabled={pending} className="ml-2 inline-flex items-center gap-1 font-medium underline underline-offset-2 disabled:opacity-50"><RotateCcw className="h-3 w-3" />Retry</button>}<p className="mt-2 border-t border-rose-200 pt-2 text-xs font-medium">Offline reference topics</p><div className="mt-1 flex flex-wrap gap-1.5">{BELLA_OFFLINE_REFERENCES.map((reference) => <button key={reference.id} type="button" onClick={() => showOfflineReference(reference.id)} className="rounded border border-rose-200 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-rose-50">{reference.title}</button>)}</div></div>}
           </div>
 
           <div className="border-t border-zinc-200 bg-white px-4 py-3">

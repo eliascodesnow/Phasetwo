@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { CalendarDays, CircleDot, Droplets, Pencil, Trash2 } from "lucide-react";
 import type { CycleProfile } from "../types";
 import { BLEEDING_LABELS, IMPACT_LABELS, PAIN_LOCATION_LABELS, SYMPTOM_LABELS, type SymptomLog } from "../lib/symptoms";
@@ -5,7 +6,10 @@ import { editPeriodStart, removePeriodStart } from "../lib/cycleUtils";
 import { PeriodCalendar } from "./PeriodCalendar";
 import { SaveChangesButton } from "./SaveChangesButton";
 
-export function HistoryView({ profile, logs, onProfileChange, onEditLog, onSave, saving, savedAt }: { profile: CycleProfile; logs: SymptomLog[]; onProfileChange: (profile: CycleProfile) => void; onEditLog: (date: string) => void; onSave: () => Promise<void>; saving: boolean; savedAt: Date | null }) {
+// The health report is only needed when someone scrolls to it, so it loads on demand.
+const ReportView = lazy(() => import("./ReportView").then((module) => ({ default: module.ReportView })));
+
+export function HistoryView({ displayName, age, profile, logs, onProfileChange, onEditLog, onSave, saving, savedAt }: { displayName?: string; age?: number; profile: CycleProfile; logs: SymptomLog[]; onProfileChange: (profile: CycleProfile) => void; onEditLog: (date: string) => void; onSave: () => Promise<void>; saving: boolean; savedAt: Date | null }) {
   const sortedLogs = [...logs].sort((left, right) => right.log_date.localeCompare(left.log_date));
   const starts = profile.periodStartDates?.length ? [...profile.periodStartDates].reverse() : [profile.lastPeriodStart];
 
@@ -14,7 +18,7 @@ export function HistoryView({ profile, logs, onProfileChange, onEditLog, onSave,
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-sage-dark">Your records</p>
         <h1 className="mt-1 font-display text-2xl font-semibold text-zinc-900">Cycle history</h1>
-        <p className="mt-1 text-sm text-zinc-500">Period starts and daily pain notes, together on your calendar.</p>
+        <p className="mt-1 text-sm text-zinc-500">Period starts and daily pain notes, together on your calendar. <a href="#health-report" className="font-medium text-sage-dark underline underline-offset-2">Jump to your health report</a></p>
       </div>
       <PeriodCalendar profile={profile} logs={logs} onRecordPeriodStart={() => undefined} showRecordButton={false} />
       <div className="grid gap-6 lg:grid-cols-2">
@@ -56,6 +60,9 @@ export function HistoryView({ profile, logs, onProfileChange, onEditLog, onSave,
           ) : <p className="mt-4 text-sm text-zinc-500">Pain and symptom entries appear here when you save a daily check-in.</p>}
         </section>
       </div>
+      <Suspense fallback={<p role="status" className="text-sm text-zinc-500">Loading your report…</p>}>
+        <ReportView profile={profile} logs={logs} displayName={displayName} age={age} />
+      </Suspense>
       <SaveChangesButton onSave={onSave} saving={saving} savedAt={savedAt} />
     </div>
   );

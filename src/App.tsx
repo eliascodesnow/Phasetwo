@@ -1,19 +1,9 @@
-import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, type ComponentType, type LazyExoticComponent, useEffect, useRef, useState, type FormEvent } from "react";
 import { CalendarDays, FileText, HeartPulse, Home, ListTodo, LogOut, Leaf, LogIn, Settings, ShieldCheck } from "lucide-react";
-import { Analytics } from "@vercel/analytics/react";
 import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
 import { defaultCycleProfile, defaultSettings } from "./lib/storage";
 import { CycleHeader } from "./components/CycleHeader";
-import { TaskPlanner } from "./components/TaskPlanner";
-import { LDRModule } from "./components/LDRModule";
 import { SymptomLogger, type SymptomLoggerSaveRef } from "./components/SymptomLogger";
-import { EndometriosisAwareness } from "./components/EndometriosisAwareness";
-import { PeriodCalendar } from "./components/PeriodCalendar";
-import { HistoryView } from "./components/HistoryView";
-import { ReportView } from "./components/ReportView";
-import { SettingsView } from "./components/SettingsView";
-import { PartnerAdviceLauncher } from "./components/PartnerAdviceLauncher";
-import { AskBellaLauncher } from "./components/AskBellaLauncher";
 import { AuthGate } from "./components/AuthGate";
 import { LegalConsentGate } from "./components/LegalConsentGate";
 import { PRIVACY_URL, syncLegalAcceptance, TERMS_URL } from "./lib/legal";
@@ -21,6 +11,7 @@ import { supabase } from "./lib/supabase";
 import { clearLocalUserData, LOCAL_GUEST_ID, loadLocalAppState, saveLocalAppState, type UserAppState } from "./lib/storage";
 import { loadSyncedAppState, saveSyncedAppState } from "./lib/userData";
 import { recordPeriodStart } from "./lib/cycleUtils";
+import { useScrollLock } from "./lib/scrollLock";
 import { pendingPartnerCode } from "./lib/partnerInvite";
 import { sendDueReminder } from "./lib/notifications";
 import type { SymptomLog } from "./lib/symptoms";
@@ -30,6 +21,20 @@ import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
 const AppTour = lazy(() => import("./components/AppTour").then((module) => ({ default: module.AppTour })));
 import { GoogleG } from "./components/GoogleG";
 import { PeriodQuickLog } from "./components/PeriodQuickLog";
+
+// Screens and floating helpers load when first needed, so the first visit downloads far less on mobile data.
+function lazyNamed<M extends Record<string, unknown>, K extends keyof M>(load: () => Promise<M>, key: K): LazyExoticComponent<M[K] extends ComponentType<any> ? M[K] : never> {
+  return lazy(() => load().then((module) => ({ default: module[key] as never })));
+}
+const TaskPlanner = lazyNamed(() => import("./components/TaskPlanner"), "TaskPlanner");
+const LDRModule = lazyNamed(() => import("./components/LDRModule"), "LDRModule");
+const EndometriosisAwareness = lazyNamed(() => import("./components/EndometriosisAwareness"), "EndometriosisAwareness");
+const PeriodCalendar = lazyNamed(() => import("./components/PeriodCalendar"), "PeriodCalendar");
+const HistoryView = lazyNamed(() => import("./components/HistoryView"), "HistoryView");
+const SettingsView = lazyNamed(() => import("./components/SettingsView"), "SettingsView");
+const PartnerAdviceLauncher = lazyNamed(() => import("./components/PartnerAdviceLauncher"), "PartnerAdviceLauncher");
+const AskBellaLauncher = lazyNamed(() => import("./components/AskBellaLauncher"), "AskBellaLauncher");
+const Analytics = lazy(() => import("@vercel/analytics/react").then((module) => ({ default: module.Analytics })));
 
 const SELF_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 type WorkspaceView = "today" | "calendar" | "planner" | "history" | "report" | "settings" | "login";
@@ -58,7 +63,7 @@ export default function App() {
           <WorkspaceApp key={user?.id ?? LOCAL_GUEST_ID} userId={user?.id ?? LOCAL_GUEST_ID} isAuthenticated={Boolean(user)} weeklyLoginStreak={weeklyLoginStreak} />
         </>
       )}</AuthGate>
-      <Analytics />
+      <Suspense fallback={null}><Analytics /></Suspense>
     </LegalConsentGate>
   );
 }
@@ -90,6 +95,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [detailsError, setDetailsError] = useState("");
   const deletingAccount = useRef(false);
   const symptomSaveAction = useRef<SymptomLoggerSaveRef["current"]>(null);
+  useScrollLock(appReady && !isAuthenticated && !settings.personalDetailsPromptSeen);
 
   useEffect(() => {
     const mode = settings.themeMode ?? "light";
@@ -358,7 +364,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
   return (
     <div className="min-h-screen bg-base">
-      {!(activeView === "login" && !isAuthenticated && supabase) && <header className="border-b border-zinc-200 bg-white/80 backdrop-saturate-150 sticky top-0 z-30">
+      {!(activeView === "login" && !isAuthenticated && supabase) && <header className="border-b border-zinc-200 bg-white/95 backdrop-blur backdrop-saturate-150 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-8">
           <div className="flex items-center gap-2 py-1">
             <Leaf className="w-4.5 h-4.5 text-sage" strokeWidth={1.75} />
@@ -389,6 +395,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       {activeView === "login" && !isAuthenticated && supabase && <div className="flex min-h-14 items-center justify-between border-b border-zinc-200 px-4"><span className="font-display font-bold text-zinc-900">PhaseTwo</span><button type="button" onClick={() => setActiveView("today")} className="inline-flex min-h-11 items-center gap-2 text-sm text-zinc-600"><LogIn className="h-4 w-4 rotate-180" />Back</button></div>}
 
       <main className="max-w-6xl mx-auto space-y-7 px-4 py-6 pb-10 sm:px-8 sm:py-8">
+        <Suspense fallback={<p role="status" className="py-10 text-center text-sm text-zinc-500">Loading…</p>}>
         {!isAuthenticated && supabase && activeView === "login" && <section className="mx-auto mt-6 max-w-sm">
           <h1 className="font-display text-3xl font-bold text-zinc-900">Sign in</h1>
           <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="mt-8 inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-full border border-zinc-300 bg-white px-4 text-[15px] font-semibold text-zinc-800 transition-[background-color,transform] hover:bg-zinc-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60">
@@ -425,10 +432,10 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
         {activeView === "planner" && <section className="space-y-5"><div><p className="text-sm font-medium text-sage-dark">Plans that can flex</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Planner</h1><p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">Cycle-phase suggestions describe typical patterns, not a promise about your energy. Adjust plans to how you feel.</p></div><TaskPlanner profile={displayedProfile} tasks={tasks} onChange={setTasks} /></section>}
 
-        {activeView === "history" && <HistoryView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("today"); }} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
-        {activeView === "report" && <ReportView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} displayName={settings.displayName} age={settings.age} />}
+        {activeView === "history" && <HistoryView displayName={settings.displayName} age={settings.age} profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("today"); }} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
         {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} initialPartnerCode={incomingPartnerCode} onInitialPartnerCodeUsed={() => setIncomingPartnerCode(null)} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} onStartTour={startTour} />}
 
+      </Suspense>
       </main>
 
       <footer className="max-w-6xl mx-auto px-6 sm:px-10 py-8 text-xs text-zinc-400">
@@ -439,8 +446,8 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
       {tourOpen && <Suspense fallback={null}><AppTour role={settings.role} onNavigate={(view) => { setActiveView(view); window.scrollTo({ top: 0 }); }} onClose={closeTour} /></Suspense>}
 
-      {settings.role === "self" && <AskBellaLauncher isAuthenticated={isAuthenticated} onSignIn={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} />}
-      {showLdr && <PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} />}
+      {settings.role === "self" && <Suspense fallback={null}><AskBellaLauncher isAuthenticated={isAuthenticated} onSignIn={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} /></Suspense>}
+      {showLdr && <Suspense fallback={null}><PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} /></Suspense>}
 
       {!isAuthenticated && !settings.personalDetailsPromptSeen && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/70 p-4 backdrop-blur-sm">
         <section role="dialog" aria-modal="true" aria-labelledby="personal-details-title" className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl sm:p-7">

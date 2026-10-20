@@ -57,10 +57,10 @@ export function ReportView({ profile, logs, displayName, age }: { profile: Cycle
   }
 
   return (
-    <div className="space-y-6">
+    <div id="health-report" className="scroll-mt-24 space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-sage-dark">Appointment preparation</p>
-        <h1 className="mt-1 font-display text-2xl font-semibold text-zinc-900">Health history report</h1>
+        <h2 className="mt-1 font-display text-xl font-semibold text-zinc-900">Health history report</h2>
         <p className="mt-1 text-sm text-zinc-500">Generated from your recorded cycle and daily symptom history. Review it before sharing.</p>
       </div>
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6">

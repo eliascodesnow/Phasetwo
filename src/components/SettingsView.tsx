@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Trash2, Bell, BellOff, Check } from "lucide-react";
 import type { AppSettings, CycleProfile, ThemeMode } from "../types";
 import { MEDICAL_DISCLAIMER } from "../lib/endoContent";
 import { editPeriodStart } from "../lib/cycleUtils";
@@ -145,20 +145,25 @@ export function SettingsView({
         </div>
       </section>
 
-      <section className="border-b border-zinc-200 pb-5" aria-labelledby="reminders-heading">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="max-w-md">
-            <h2 id="reminders-heading" className="font-display text-base font-semibold text-zinc-900">Period reminders</h2>
-            <p className="mt-1 text-sm text-zinc-500">Get a notification 2 days and 1 day before your predicted period. Works even when the app is closed once notifications are allowed.</p>
-            {reminderPermission === "denied" && <p role="alert" className="mt-1 text-xs text-rose-700">Notifications are blocked for this site. Allow them in your browser settings, then turn this on.</p>}
-            {reminderPermission === "unsupported" && <p className="mt-1 text-xs text-zinc-500">This browser does not support notifications.</p>}
+      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-card sm:p-5" aria-labelledby="reminders-heading">
+        <div className="flex items-center gap-3.5">
+          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors duration-300 ${settings.periodReminders ? "bg-[var(--period-solid)] text-white" : "bg-zinc-100 text-zinc-500"}`} aria-hidden="true">
+            {settings.periodReminders ? <Bell className="h-5 w-5" strokeWidth={2} /> : <BellOff className="h-5 w-5" strokeWidth={2} />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 id="reminders-heading" className="font-display text-[15px] font-semibold leading-tight text-zinc-900">Period reminders</h2>
+            <p className="mt-0.5 text-[13px] leading-snug text-zinc-500">{settings.periodReminders ? "On · 2 days and 1 day before" : "Off · tap to get a heads-up"}</p>
           </div>
-          <button type="button" role="switch" aria-checked={Boolean(settings.periodReminders)} aria-label="Period reminders" disabled={reminderPermission === "unsupported"}
+          <button type="button" role="switch" aria-checked={Boolean(settings.periodReminders)} aria-labelledby="reminders-heading" disabled={reminderPermission === "unsupported"}
             onClick={() => void toggleReminders(!settings.periodReminders)}
-            className={`relative h-8 w-14 shrink-0 rounded-full transition-colors disabled:opacity-50 ${settings.periodReminders ? "bg-[var(--period-solid)]" : "bg-zinc-300"}`}>
-            <span className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${settings.periodReminders ? "translate-x-6" : ""}`} />
+            className={`relative inline-flex h-[30px] w-[52px] shrink-0 items-center rounded-full p-[3px] shadow-[inset_0_1px_2px_rgb(0_0_0/0.18)] outline-none transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-[var(--period-solid)] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 ${settings.periodReminders ? "bg-[var(--period-solid)]" : "bg-zinc-300"}`}>
+            <span className={`flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-[0_1px_3px_rgb(0_0_0/0.3)] transition-transform duration-300 ease-[cubic-bezier(.3,1.4,.5,1)] ${settings.periodReminders ? "translate-x-[22px]" : "translate-x-0"}`}>
+              {settings.periodReminders && <Check className="h-3.5 w-3.5 text-[var(--period-solid)]" strokeWidth={3} />}
+            </span>
           </button>
         </div>
+        {reminderPermission === "denied" && <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">Notifications are blocked for this site. Allow them in your browser settings, then switch this on.</p>}
+        {reminderPermission === "unsupported" && <p className="mt-3 text-xs text-zinc-500">This browser does not support notifications.</p>}
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">

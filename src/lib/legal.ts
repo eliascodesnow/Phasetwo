@@ -13,6 +13,40 @@ type ConsentClient = {
   from: (table: string) => { upsert: (row: Record<string, unknown>, options?: Record<string, unknown>) => PromiseLike<{ error: unknown }> };
 };
 
+const COOKIE_NAME = "pt_legal";
+
+/** A long-lived cookie backs up localStorage, which some browsers clear after a week without a visit. */
+function readCookieVersion(): { version: string; acceptedAt: string } | null {
+  try {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.split("; ").find((part) => part.startsWith(`${COOKIE_NAME}=`));
+    if (!match) return null;
+    const [version, acceptedAt] = decodeURIComponent(match.slice(COOKIE_NAME.length + 1)).split("|");
+    return version && acceptedAt ? { version, acceptedAt } : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCookie(acceptance: LegalAcceptance): void {
+  try {
+    if (typeof document === "undefined") return;
+    const secure = location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `${COOKIE_NAME}=${encodeURIComponent(`${acceptance.version}|${acceptance.acceptedAt}`)}; Max-Age=31536000; Path=/; SameSite=Lax${secure}`;
+  } catch {
+    // Cookies can be blocked; localStorage and the account record still apply.
+  }
+}
+
+/** Asks the browser not to evict this site's storage (best effort). */
+export function requestPersistentStorage(): void {
+  try {
+    void navigator.storage?.persist?.();
+  } catch {
+    // Not supported.
+  }
+}
+
 function browserStore(): LegalStore | null {
   try {
     return typeof window === "undefined" ? null : window.localStorage;
@@ -25,7 +59,13 @@ function browserStore(): LegalStore | null {
 export function readStoredAcceptance(store: LegalStore | null = browserStore()): LegalAcceptance | null {
   try {
     const raw = store?.getItem(STORAGE_KEY);
-    if (!raw) return null;
+    if (!raw) {
+      const cookie = store === browserStore() ? readCookieVersion() : null;
+      if (!cookie) return null;
+      const restored: LegalAcceptance = { ...cookie, syncedUsers: [] };
+      try { store?.setItem(STORAGE_KEY, JSON.stringify(restored)); } catch { /* storage blocked */ }
+      return restored;
+    }
     const parsed = JSON.parse(raw) as Partial<LegalAcceptance>;
     if (typeof parsed.version !== "string" || typeof parsed.acceptedAt !== "string") return null;
     return {
@@ -49,6 +89,8 @@ export function storeAcceptance(store: LegalStore | null = browserStore(), now =
   } catch {
     // Storage can be blocked; the agreement still holds for this session.
   }
+  writeCookie(acceptance);
+  requestPersistentStorage();
   return acceptance;
 }
 
@@ -73,5 +115,19 @@ export async function syncLegalAcceptance(
     return true;
   } catch {
     return false;
+  }
+}
+
+/** For a signed-in person whose browser lost its local record: the agreement already saved to their account. */
+export async function accountAcceptance(client: { auth: { getSession: () => PromiseLike<{ data: { session: { user: { id: string } } | null } }> }; from: (table: string) => any } | null = supabase as never): Promise<LegalAcceptance | null> {
+  try {
+    if (!client) return null;
+    const { data: { session } } = await client.auth.getSession();
+    if (!session) return null;
+    const { data } = await client.from("user_consents").select("health_data_consent_at, policy_version").eq("user_id", session.user.id).maybeSingle();
+    if (!data || data.policy_version !== LEGAL_VERSION || !data.health_data_consent_at) return null;
+    return { version: data.policy_version, acceptedAt: data.health_data_consent_at, syncedUsers: [session.user.id] };
+  } catch {
+    return null;
   }
 }

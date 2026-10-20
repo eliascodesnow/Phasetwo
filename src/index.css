@@ -32,16 +32,16 @@
   --period-line: #8a4a62;
   --phase-menstrual-bg: #402532;
   --phase-menstrual-text: #f2a0b7;
-  --phase-menstrual-line: #e87998;
+  --phase-menstrual-line: #ff7a9c;
   --phase-follicular-bg: #20382f;
   --phase-follicular-text: #a5d3b8;
-  --phase-follicular-line: #79b993;
+  --phase-follicular-line: #5fd08e;
   --phase-ovulatory-bg: #45351f;
   --phase-ovulatory-text: #f1c47d;
-  --phase-ovulatory-line: #e4ae61;
+  --phase-ovulatory-line: #ffb84a;
   --phase-luteal-bg: #332b42;
   --phase-luteal-text: #c4b1e0;
-  --phase-luteal-line: #ad91d4;
+  --phase-luteal-line: #b894f2;
 }
 
 html[data-theme="light"] {
@@ -74,16 +74,16 @@ html[data-theme="light"] {
   --period-line: #eab3c4;
   --phase-menstrual-bg: #f8e7ec;
   --phase-menstrual-text: #913e57;
-  --phase-menstrual-line: #c35d79;
+  --phase-menstrual-line: #c43a5f;
   --phase-follicular-bg: #e4f1e9;
   --phase-follicular-text: #35624a;
-  --phase-follicular-line: #5b9a72;
+  --phase-follicular-line: #2f8a58;
   --phase-ovulatory-bg: #f8efdc;
   --phase-ovulatory-text: #79561f;
-  --phase-ovulatory-line: #b27c2e;
+  --phase-ovulatory-line: #c47a0a;
   --phase-luteal-bg: #eee8f7;
   --phase-luteal-text: #5e4b7c;
-  --phase-luteal-line: #8871b0;
+  --phase-luteal-line: #7048b8;
 }
 
 @layer base {

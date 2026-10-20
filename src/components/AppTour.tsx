@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, FileText, HeartPulse, ListTodo, Settings } from "lucide-react";
 import { tourStepsFor, type TourRole, type TourRowIcon } from "../lib/tour";
+import { useBlockUserScroll } from "../lib/scrollLock";
 import { placeCard, sameBox, spotlightBox, spotlightClipPath, type Box, type Viewport } from "../lib/tourLayout";
 
 const ROW_ICONS: Record<TourRowIcon, typeof Settings> = {
@@ -49,6 +50,7 @@ function bringIntoView(element: HTMLElement) {
  * A short guided tour. Each step highlights one real button or area, points an arrow at it, and explains
  * how it works. `onClose` runs when the tour is finished or skipped.
  */
+
 export function AppTour({
   role,
   onNavigate,
@@ -66,6 +68,7 @@ export function AppTour({
   const [cardHeight, setCardHeight] = useState(300);
   const rootRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLElement>(null);
+  useBlockUserScroll(true, () => cardRef.current);
   const primaryRef = useRef<HTMLButtonElement>(null);
   // Read during the first render, before the card moves focus to its own button.
   const returnFocusRef = useRef<HTMLElement | null>(document.activeElement instanceof HTMLElement ? document.activeElement : null);
@@ -223,7 +226,7 @@ export function AppTour({
         role="dialog"
         aria-modal="true"
         aria-labelledby="app-tour-title"
-        className="tour-card fixed overflow-y-auto rounded-2xl border p-4 sm:p-5"
+        className="tour-card fixed overflow-y-auto overscroll-contain rounded-2xl border p-4 sm:p-5"
         style={{
           left: placement.left,
           top: placement.top,

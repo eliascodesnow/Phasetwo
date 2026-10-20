@@ -26,6 +26,19 @@ function legalPages(): Plugin {
 
 export default defineConfig({
   plugins: [react(), legalPages()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Stable vendor chunks stay cached between releases, so returning visitors re-download only app code.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("@supabase")) return "supabase";
+          if (id.includes("react") || id.includes("scheduler")) return "react";
+          return undefined;
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
   },

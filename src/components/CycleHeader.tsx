@@ -59,6 +59,18 @@ function CycleChart({ profile, day, phaseKey }: { profile: CycleProfile; day: nu
   const elapsed = points.filter((p) => p.x <= todayX);
   const upcoming = points.filter((p) => p.x >= todayX);
   const elapsedPath = toPath([...elapsed, { x: todayX, y: todayY }]);
+  // The curve is drawn in each phase's own colour, so you can read where you are at a glance.
+  const phasePaths = segments.map((segment) => {
+    const x0 = (segment.start / cycleLength) * 100;
+    const x1 = Math.min(todayX, ((segment.start + segment.days) / cycleLength) * 100);
+    if (x1 <= x0) return null;
+    const samples = Math.max(2, Math.ceil((x1 - x0) / 1.5));
+    const list = Array.from({ length: samples + 1 }, (_, i) => {
+      const x = x0 + ((x1 - x0) * i) / samples;
+      return { x, y: curveY(x / 100) };
+    });
+    return { key: `${segment.key}-${segment.start}`, tone: segment.key, d: toPath(list) };
+  });
   const upcomingPath = toPath([{ x: todayX, y: todayY }, ...upcoming]);
   const areaPath = `${toPath(points)} L 100 ${CHART_HEIGHT} L 0 ${CHART_HEIGHT} Z`;
   const activeLine = PHASE_TONE[phaseKey].line;
@@ -71,8 +83,8 @@ function CycleChart({ profile, day, phaseKey }: { profile: CycleProfile; day: nu
         {segments.map((segment) => (
           <span
             key={`${segment.key}-${segment.start}`}
-            className={`overflow-hidden whitespace-nowrap pb-1.5 pl-1 text-[10px] sm:text-[11px] ${segment.key === phaseKey ? "font-semibold text-zinc-900" : ""}`}
-            style={{ width: `${(segment.days / cycleLength) * 100}%` }}
+            className={`overflow-hidden whitespace-nowrap pb-1.5 pl-1 text-[10px] font-semibold sm:text-[11px] ${segment.key === phaseKey ? "underline decoration-2 underline-offset-4" : ""}`}
+            style={{ width: `${(segment.days / cycleLength) * 100}%`, color: `var(--phase-${segment.key}-text)` }}
           >
             {segment.days / cycleLength > 0.12 ? (
               segment.key === "menstrual"
@@ -87,7 +99,7 @@ function CycleChart({ profile, day, phaseKey }: { profile: CycleProfile; day: nu
         <svg viewBox={`0 0 100 ${CHART_HEIGHT}`} preserveAspectRatio="none" className="h-full w-full overflow-visible" aria-hidden="true">
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={activeLine} stopOpacity="0.28" />
+              <stop offset="0%" stopColor={activeLine} stopOpacity="0.35" />
               <stop offset="100%" stopColor={activeLine} stopOpacity="0" />
             </linearGradient>
           </defs>
@@ -99,18 +111,21 @@ function CycleChart({ profile, day, phaseKey }: { profile: CycleProfile; day: nu
               y={0}
               height={CHART_HEIGHT}
               style={{ fill: PHASE_TONE[segment.key].line }}
-              opacity={segment.key === phaseKey ? 0.2 : 0.09}
+              opacity={segment.key === phaseKey ? 0.34 : 0.16}
             />
           ))}
+          {segments.slice(1).map((segment) => (
+            <line key={`edge-${segment.key}-${segment.start}`} x1={(segment.start / cycleLength) * 100} x2={(segment.start / cycleLength) * 100} y1={0} y2={CHART_HEIGHT} strokeWidth={1} vectorEffect="non-scaling-stroke" style={{ stroke: "var(--zinc-400)" }} opacity={0.55} />
+          ))}
           <path d={areaPath} fill={`url(#${gradientId})`} />
-          <path d={upcomingPath} fill="none" strokeDasharray="1.5 2.5" strokeLinecap="round" strokeWidth={2} vectorEffect="non-scaling-stroke" className="stroke-zinc-400" />
-          <path d={elapsedPath} fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} vectorEffect="non-scaling-stroke" style={{ stroke: activeLine }} />
+          <path d={upcomingPath} fill="none" strokeDasharray="3 4" strokeLinecap="round" strokeWidth={2.5} vectorEffect="non-scaling-stroke" style={{ stroke: "var(--zinc-500)" }} />
+          {phasePaths.map((path) => path && <path key={path.key} d={path.d} fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} vectorEffect="non-scaling-stroke" style={{ stroke: PHASE_TONE[path.tone].line }} />)}
         </svg>
 
         {/* Today marker lives in HTML so it stays round whatever the chart width. */}
-        <span className="pointer-events-none absolute inset-y-0 w-px -translate-x-1/2" style={{ left: `${todayX}%`, backgroundColor: "var(--zinc-400)", opacity: 0.6 }} aria-hidden="true" />
+        <span className="pointer-events-none absolute inset-y-0 w-px -translate-x-1/2" style={{ left: `${todayX}%`, backgroundColor: "var(--zinc-500)", opacity: 0.7 }} aria-hidden="true" />
         <span
-          className="pointer-events-none absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow"
+          className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] shadow-md"
           style={{ left: `${todayX}%`, top: `${(todayY / CHART_HEIGHT) * 100}%`, backgroundColor: activeLine, borderColor: "var(--color-surface)" }}
           aria-hidden="true"
         />

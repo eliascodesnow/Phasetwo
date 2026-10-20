@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Leaf } from "lucide-react";
-import { isCurrentAcceptance, PRIVACY_URL, readStoredAcceptance, storeAcceptance, TERMS_URL } from "../lib/legal";
+import { accountAcceptance, isCurrentAcceptance, requestPersistentStorage, PRIVACY_URL, readStoredAcceptance, storeAcceptance, TERMS_URL } from "../lib/legal";
 
 const COLLECTS = [
   "Your email or Google sign-in (only if you sign in)",
@@ -25,6 +25,17 @@ export function LegalConsentGate({ children }: { children: ReactNode }) {
     const stored = readStoredAcceptance();
     return Boolean(stored) && !isCurrentAcceptance(stored);
   });
+  useEffect(() => {
+    if (accepted) { requestPersistentStorage(); return; }
+    // The browser forgot, but a signed-in account remembers: restore it instead of asking again.
+    let cancelled = false;
+    void accountAcceptance().then((saved) => {
+      if (cancelled || !saved) return;
+      storeAcceptance(undefined, new Date(saved.acceptedAt));
+      setAccepted(true);
+    });
+    return () => { cancelled = true; };
+  }, [accepted]);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreeHealth, setAgreeHealth] = useState(false);
 
