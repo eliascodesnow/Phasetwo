@@ -60,7 +60,7 @@ export function PartnerAdviceLauncher({
   const phase = phaseForDay(day, profile.cycleLength);
 
   return (
-    <div className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] left-4 z-40 print:hidden lg:bottom-4">
+    <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 z-40 print:hidden lg:bottom-4">
       {open && <div className="fixed inset-0 z-40 bg-zinc-950/20" onClick={() => setOpen(false)} />}
       {open && <section role="dialog" aria-modal="true" aria-labelledby="partner-advice-title" className="absolute bottom-14 left-0 z-50 flex max-h-[min(78vh,760px)] w-[min(420px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-xl border border-zinc-200 bg-[#fbf7f5] p-3 shadow-xl sm:p-4">
         <div className="mb-3 flex items-center justify-between gap-3">

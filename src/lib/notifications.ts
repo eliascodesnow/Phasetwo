@@ -1,5 +1,8 @@
 import type { CycleProfile } from "../types";
 import { dueReminder } from "./reminders";
+import { supabase } from "./supabase";
+
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY ?? "";
 
 export type ReminderSupport = "unsupported" | "denied" | "default" | "granted";
 
@@ -17,12 +20,57 @@ async function registration(): Promise<ServiceWorkerRegistration | null> {
   }
 }
 
-/** Asks for notification permission. Must be called from a user gesture (e.g. a button click). */
+function keyToBytes(base64Url: string): Uint8Array {
+  const padded = base64Url.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(base64Url.length / 4) * 4, "=");
+  return Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
+}
+
+/** Saves a Web Push subscription for the signed-in account so the server can notify while the app is closed. */
+async function subscribeForPush(): Promise<void> {
+  if (!VAPID_PUBLIC_KEY || !supabase || !("serviceWorker" in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register("/sw.js").then(() => navigator.serviceWorker.ready);
+    if (!("pushManager" in reg)) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const subscription = (await reg.pushManager.getSubscription())
+      ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(VAPID_PUBLIC_KEY) as BufferSource });
+    const json = subscription.toJSON();
+    if (json.endpoint && json.keys?.p256dh && json.keys.auth) {
+      await supabase.from("push_subscriptions").upsert(
+        { user_id: user.id, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth, user_agent: navigator.userAgent.slice(0, 200) },
+        { onConflict: "endpoint" },
+      );
+    }
+  } catch {
+    // The on-open reminder still works without a server push subscription.
+  }
+}
+
+/** Asks for notification permission and sets up server push. Must be called from a user gesture (e.g. a button click). */
 export async function enableReminders(): Promise<ReminderSupport> {
   if (reminderSupport() === "unsupported") return "unsupported";
   const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
-  if (permission === "granted") await registration();
+  if (permission === "granted") {
+    await registration();
+    await subscribeForPush();
+  }
   return permission;
+}
+
+/** Removes this device's push subscription (the in-app toggle was switched off). */
+export async function disableReminders(): Promise<void> {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+    const subscription = await reg?.pushManager.getSubscription();
+    if (subscription) {
+      if (supabase) await supabase.from("push_subscriptions").delete().eq("endpoint", subscription.endpoint);
+      await subscription.unsubscribe();
+    }
+  } catch {
+    // Nothing to clean up if the browser has no subscription.
+  }
 }
 
 function alreadySent(key: string): boolean {

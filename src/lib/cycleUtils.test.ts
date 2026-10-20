@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classifyDay } from "../components/PeriodCalendar";
-import { calculateWeeklyPeriodStreak, editPeriodStart, energyAtCycleFraction, recordPeriodStart, removePeriodStart } from "./cycleUtils";
+import { calculateWeeklyPeriodStreak, daysUntilNextPeriod, editPeriodStart, energyAtCycleFraction, periodStartContaining, predictedPeriodStarts, recordPeriodEnd, recordPeriodStart, removePeriodStart } from "./cycleUtils";
 
 describe("period start tracking", () => {
   const profile = {
@@ -100,5 +100,49 @@ describe("period start tracking", () => {
     expect(energyAtCycleFraction(0.5)).toBeGreaterThan(energyAtCycleFraction(0.9));
     expect(energyAtCycleFraction(-1)).toBe(energyAtCycleFraction(0));
     expect(energyAtCycleFraction(2)).toBe(energyAtCycleFraction(1));
+  });
+});
+
+describe("period end and predictions", () => {
+  const base = {
+    lastPeriodStart: "2026-10-07",
+    periodStartDates: ["2026-10-07"],
+    cycleLength: 28,
+    periodLength: 5,
+    ownerLabel: "You",
+    timezone: "UTC",
+    city: "",
+  };
+  const asOf = new Date("2026-10-09T12:00:00");
+
+  it("ends a period early and stops marking later days", () => {
+    const ended = recordPeriodEnd(base, "2026-10-07", "2026-10-09");
+    expect(classifyDay("2026-10-09", ["2026-10-07"], 5, "2026-10-09", "", { ends: ended.periodEnds })).toBe("recorded");
+    expect(classifyDay("2026-10-10", ["2026-10-07"], 5, "2026-10-09", "", { ends: ended.periodEnds })).toBe("none");
+  });
+
+  it("ignores an end before the start", () => {
+    expect(recordPeriodEnd(base, "2026-10-07", "2026-10-05")).toBe(base);
+  });
+
+  it("drops the end date when its period is removed", () => {
+    const two = recordPeriodStart(recordPeriodEnd(base, "2026-10-07", "2026-10-09"), "2026-11-04");
+    expect(removePeriodStart(two, "2026-10-07").periodEnds?.["2026-10-07"]).toBeUndefined();
+  });
+
+  it("finds the period that contains a day", () => {
+    expect(periodStartContaining(base, "2026-10-10")).toBe("2026-10-07");
+    expect(periodStartContaining(base, "2026-10-20")).toBeUndefined();
+  });
+
+  it("predicts several future periods one cycle apart and marks them", () => {
+    const starts = predictedPeriodStarts(base, 3, asOf);
+    expect(starts).toEqual(["2026-11-04", "2026-12-02", "2026-12-30"]);
+    expect(classifyDay("2026-12-03", ["2026-10-07"], 5, "2026-10-09", "", { futureStarts: starts })).toBe("estimated");
+    expect(classifyDay("2026-12-08", ["2026-10-07"], 5, "2026-10-09", "", { futureStarts: starts })).toBe("none");
+  });
+
+  it("counts days until the next period", () => {
+    expect(daysUntilNextPeriod(base, asOf)).toBe(26);
   });
 });

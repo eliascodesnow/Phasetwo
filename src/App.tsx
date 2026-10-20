@@ -1,10 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
-import { CalendarDays, FileText, HeartPulse, Home, ListTodo, LogOut, Leaf, LogIn, MoreHorizontal, Settings, ShieldCheck } from "lucide-react";
+import { CalendarDays, FileText, HeartPulse, Home, ListTodo, LogOut, Leaf, LogIn, Settings, ShieldCheck } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
 import { defaultCycleProfile, defaultSettings } from "./lib/storage";
 import { CycleHeader } from "./components/CycleHeader";
-import { GoogleLogo } from "./components/GoogleLogo";
 import { TaskPlanner } from "./components/TaskPlanner";
 import { LDRModule } from "./components/LDRModule";
 import { SymptomLogger, type SymptomLoggerSaveRef } from "./components/SymptomLogger";
@@ -29,6 +28,8 @@ import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
 
 // Loaded on demand: the tour is shown once per person, so it should not weigh down the main bundle.
 const AppTour = lazy(() => import("./components/AppTour").then((module) => ({ default: module.AppTour })));
+import { GoogleG } from "./components/GoogleG";
+import { PeriodQuickLog } from "./components/PeriodQuickLog";
 
 const SELF_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 type WorkspaceView = "today" | "calendar" | "planner" | "history" | "report" | "settings" | "login";
@@ -80,7 +81,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
-  const [moreOpen, setMoreOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
   const tourStartView = useRef<WorkspaceView>("today");
   const tourAutoHandled = useRef(false);
@@ -135,7 +135,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
   function startTour() {
     tourStartView.current = activeView;
-    setMoreOpen(false);
     setTourOpen(true);
   }
 
@@ -293,7 +292,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     if (error) {
       setLoginError(error.message);
     } else {
-      setLoginMessage("Check your email for a sign-in link.");
+      setLoginMessage("Check your email.");
     }
     setLoginBusy(false);
   }
@@ -387,58 +386,42 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         </div>
       </header>}
 
-      {activeView === "login" && !isAuthenticated && supabase && <div className="flex min-h-14 items-center justify-between border-b border-zinc-200 px-4"><span className="font-display font-bold text-zinc-900">PhaseTwo</span><button type="button" onClick={() => setActiveView("today")} className="inline-flex min-h-11 items-center gap-2 text-sm text-zinc-600"><LogIn className="h-4 w-4 rotate-180" />Back to tracker</button></div>}
+      {activeView === "login" && !isAuthenticated && supabase && <div className="flex min-h-14 items-center justify-between border-b border-zinc-200 px-4"><span className="font-display font-bold text-zinc-900">PhaseTwo</span><button type="button" onClick={() => setActiveView("today")} className="inline-flex min-h-11 items-center gap-2 text-sm text-zinc-600"><LogIn className="h-4 w-4 rotate-180" />Back</button></div>}
 
-      <main className="max-w-6xl mx-auto space-y-7 px-4 py-6 pb-24 sm:px-8 sm:py-8">
-        {!isAuthenticated && supabase && activeView === "login" && <section className="mx-auto max-w-lg rounded-[28px] border border-zinc-200 bg-white p-6 shadow-card sm:p-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sage-light text-sage-dark">
-              <ShieldCheck className="h-5 w-5" strokeWidth={2} />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Welcome back</p>
-              <h2 className="font-display text-2xl font-semibold text-zinc-900">Sign in</h2>
-            </div>
-          </div>
-          <p className="mt-4 text-sm leading-6 text-zinc-600">Use your account to sync cycle data across devices and keep your weekly streak going.</p>
-          <div className="mt-5 space-y-3">
-            <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-2xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60">
-              <GoogleLogo className="h-5 w-5" />
-              Continue with Google
+      <main className="max-w-6xl mx-auto space-y-7 px-4 py-6 pb-10 sm:px-8 sm:py-8">
+        {!isAuthenticated && supabase && activeView === "login" && <section className="mx-auto mt-6 max-w-sm">
+          <h1 className="font-display text-3xl font-bold text-zinc-900">Sign in</h1>
+          <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="mt-8 inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-full border border-zinc-300 bg-white px-4 text-[15px] font-semibold text-zinc-800 transition-[background-color,transform] hover:bg-zinc-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60">
+            <GoogleG className="h-5 w-5" />
+            Sign in with Google
+          </button>
+          <div className="my-6 flex items-center gap-3 text-xs text-zinc-400"><span className="h-px flex-1 bg-zinc-200" />or<span className="h-px flex-1 bg-zinc-200" /></div>
+          <form className="space-y-3" onSubmit={(event) => void handleEmailSignIn(event)}>
+            <label className="block text-sm font-medium text-zinc-700">Email
+              <input name="email" type="email" autoComplete="email" required className="mt-1.5 min-h-12 w-full rounded-2xl border border-zinc-300 bg-white px-4 text-base text-zinc-900 outline-none transition focus:border-sage-dark focus:ring-2 focus:ring-sage/20" />
+            </label>
+            {loginError && <p role="alert" className="text-sm text-rose-700">{loginError}</p>}
+            {loginMessage && <p role="status" className="text-sm font-medium text-sage-dark">{loginMessage}</p>}
+            <button type="submit" disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-sage-dark px-4 text-[15px] font-semibold text-white transition-[background-color,transform] hover:bg-sage-darker active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60">
+              Email me a link
             </button>
-            <form className="space-y-3" onSubmit={(event) => void handleEmailSignIn(event)}>
-              <label className="block text-sm font-medium text-zinc-700">Email
-                <input name="email" type="email" autoComplete="email" required className="mt-1.5 min-h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none transition focus:border-sage-dark focus:ring-2 focus:ring-sage/20" />
-              </label>
-              {loginError && <p role="alert" className="text-sm text-rose-700">{loginError}</p>}
-              {loginMessage && <p role="status" className="text-sm text-sage-dark">{loginMessage}</p>}
-              <button type="submit" disabled={loginBusy} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-sage-dark px-4 text-sm font-medium text-white transition-colors hover:bg-sage-darker disabled:cursor-not-allowed disabled:opacity-60">
-                <LogIn className="h-4 w-4" strokeWidth={2} />
-                Send magic link
-              </button>
-            </form>
-          </div>
+          </form>
         </section>}
 
         {activeView === "today" && <>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="text-sm font-medium text-sage-dark">{new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date())}</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Today</h1>{settings.displayName && <p className="mt-1 text-sm text-zinc-600">Hello, {settings.displayName}</p>}</div>
-            {settings.role === "self" && <button type="button" data-tour="record-period" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-sage/40 px-4 text-sm font-semibold text-sage-dark transition-colors hover:bg-sage-light"><HeartPulse className="h-4 w-4" />Period started</button>}
-          </div>
+                      </div>
           <CycleHeader profile={displayedProfile} />
           {settings.role === "self" && isAuthenticated && <WeeklyStreakCard weeks={weeklyLoginStreak} />}
-          {settings.role === "self" && <div className="mx-auto flex justify-center">
-            <button type="button" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#b96070] px-7 py-3 text-sm font-semibold text-white shadow-card transition-colors hover:bg-[#a95263]">
-              <HeartPulse className="h-4 w-4" />Record period
-            </button>
-          </div>}
-          <PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} />
+          {settings.role === "self" && <PeriodQuickLog profile={profile} onChange={setProfile} />}
+          <PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setFocusCheckin(true); }} />
           {settings.role === "self" && <SymptomLogger profile={profile} userId={userId} initialLogDate={editingLogDate} onHistoryChange={setSymptomLogs} saveActionRef={symptomSaveAction} />}
           {showLdr && <LDRModule profile={displayedProfile} selfTimezone={SELF_TIMEZONE} />}
           {settings.role === "self" && <EndometriosisAwareness logs={symptomLogs} profile={profile} />}
         </>}
 
-        {activeView === "calendar" && <section className="space-y-5"><div><p className="text-sm font-medium text-sage-dark">Your records, not a forecast</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Calendar</h1><p className="mt-1 text-sm text-zinc-500">Recorded period dates and symptom entries are distinct from estimates.</p></div><PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} onEditLog={(date) => { setEditingLogDate(date); setActiveView("today"); }} /></section>}
+        {activeView === "calendar" && <section className="space-y-5"><div><p className="text-sm font-medium text-sage-dark">Recorded and predicted</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Calendar</h1><p className="mt-1 text-sm text-zinc-500">Tap a day to log it.</p></div><PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("today"); }} /></section>}
 
         {activeView === "planner" && <section className="space-y-5"><div><p className="text-sm font-medium text-sage-dark">Plans that can flex</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Planner</h1><p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">Cycle-phase suggestions describe typical patterns, not a promise about your energy. Adjust plans to how you feel.</p></div><TaskPlanner profile={displayedProfile} tasks={tasks} onChange={setTasks} /></section>}
 
@@ -493,24 +476,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         </section>
       </div>}
 
-      {activeView !== "login" && <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-base px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-5">
-          {[
-            { key: "today" as const, label: "Today", icon: Home },
-            { key: "calendar" as const, label: "Calendar", icon: CalendarDays },
-            { key: "log" as const, label: "Log", icon: HeartPulse },
-            { key: "planner" as const, label: "Planner", icon: ListTodo },
-          ].map(({ key, label, icon: Icon }) => (
-            <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { setMoreOpen(false); if (key === "log") { setEditingLogDate(undefined); setFocusCheckin(true); setActiveView("today"); } else setActiveView(key); }} className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium ${activeView === key || (key === "log" && focusCheckin) ? "text-sage-dark" : "text-zinc-500"}`}>
-              <Icon className="h-5 w-5" strokeWidth={1.8} />{label}
-            </button>
-          ))}
-          <button type="button" aria-expanded={moreOpen} aria-haspopup="menu" onClick={() => setMoreOpen((value) => !value)} className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium ${moreOpen || ["history", "report", "settings"].includes(activeView) ? "text-sage-dark" : "text-zinc-500"}`}><MoreHorizontal className="h-5 w-5" />More</button>
-        </div>
-      </nav>}
-      {moreOpen && <div role="menu" aria-label="More destinations" className="fixed bottom-[4.5rem] right-3 z-50 w-52 rounded-lg border border-zinc-200 bg-white p-2 shadow-xl lg:hidden">
-        {[{ key: "history" as const, label: "History", icon: FileText }, { key: "report" as const, label: "Health report", icon: HeartPulse }, { key: "settings" as const, label: "Settings", icon: Settings }].map(({ key, label, icon: Icon }) => <button key={key} role="menuitem" type="button" onClick={() => { setActiveView(key); setMoreOpen(false); }} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-zinc-700 hover:bg-zinc-100"><Icon className="h-4 w-4" />{label}</button>)}
-      </div>}
     </div>
   );
 }

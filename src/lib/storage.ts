@@ -89,6 +89,7 @@ export function loadLocalAppState(userId: string): UserAppState {
         themeMode: accountState.appSettings?.themeMode === "dark" || accountState.appSettings?.themeMode === "system"
           ? accountState.appSettings.themeMode
           : "light",
+        periodReminders: Boolean(accountState.appSettings?.periodReminders),
         displayName: typeof accountState.appSettings?.displayName === "string" ? accountState.appSettings.displayName.trim().slice(0, 80) || undefined : undefined,
         age: Number.isInteger(accountState.appSettings?.age) && Number(accountState.appSettings.age) >= 1 && Number(accountState.appSettings.age) <= 120
           ? Number(accountState.appSettings.age)
@@ -123,6 +124,7 @@ export function loadLocalAppState(userId: string): UserAppState {
         role: storage.loadSettings().role,
         ldrEnabled: storage.loadSettings().ldrEnabled,
         themeMode: storage.loadSettings().themeMode,
+        periodReminders: storage.loadSettings().periodReminders,
       },
     chatMessages: storage.loadChat(),
   };

@@ -154,10 +154,10 @@ export function AskBellaLauncher({ isAuthenticated, onSignIn }: { isAuthenticate
   }
 
   return (
-    <div className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 print:hidden lg:bottom-6 lg:right-6">
+    <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 print:hidden lg:bottom-6 lg:right-6">
       {open && <button type="button" aria-label="Close Ask Bella" onClick={() => setOpen(false)} className="fixed inset-0 z-40 cursor-default bg-zinc-950/20 sm:bg-transparent" />}
       {open && (
-        <section role="dialog" aria-modal="true" aria-labelledby="ask-bella-title" className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-50 flex h-[min(720px,calc(100dvh-7rem-env(safe-area-inset-bottom)))] w-[min(440px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-[#fcfbf9] shadow-2xl lg:bottom-24 lg:right-6 lg:h-[min(720px,calc(100dvh-6.5rem))]">
+        <section role="dialog" aria-modal="true" aria-labelledby="ask-bella-title" className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-3 z-50 flex h-[min(720px,calc(100dvh-6rem-env(safe-area-inset-bottom)))] w-[min(440px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-[#fcfbf9] shadow-2xl lg:bottom-24 lg:right-6 lg:h-[min(720px,calc(100dvh-6.5rem))]">
           <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3.5">
             <div className="min-w-0">
               <div className="min-w-0">

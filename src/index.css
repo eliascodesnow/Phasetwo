@@ -26,6 +26,9 @@
   --zinc-800: #eee6ef;
   --zinc-900: #f7f1f7;
   --zinc-950: #fffaff;
+  --period-solid: #d0607e;
+  --period-soft: #3a2230;
+  --period-line: #8a4a62;
   --phase-menstrual-bg: #402532;
   --phase-menstrual-text: #f2a0b7;
   --phase-menstrual-line: #e87998;
@@ -64,6 +67,9 @@ html[data-theme="light"] {
   --zinc-800: #392f37;
   --zinc-900: #30242d;
   --zinc-950: #241b22;
+  --period-solid: #bf3d62;
+  --period-soft: #fcedf1;
+  --period-line: #eab3c4;
   --phase-menstrual-bg: #f8e7ec;
   --phase-menstrual-text: #913e57;
   --phase-menstrual-line: #c35d79;
@@ -178,4 +184,12 @@ input:not([type="checkbox"]):not([type="radio"]) {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+@keyframes pt-pop { from { transform: scale(0.88); opacity: 0.4; } to { transform: scale(1); opacity: 1; } }
+@keyframes pt-rise { from { transform: translateY(6px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.pt-pop { animation: pt-pop 140ms ease-out; }
+.pt-rise { animation: pt-rise 180ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .pt-pop, .pt-rise { animation: none; }
 }
