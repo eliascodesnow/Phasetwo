@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { readWeeklyLoginStreak, recordWeeklyLogin } from "../lib/storage";
+import { capturePartnerCodeFromUrl } from "../lib/partnerInvite";
 
 export function AuthGate({ children }: { children: (user: User | null, weeklyStreak: number) => ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -9,6 +10,7 @@ export function AuthGate({ children }: { children: (user: User | null, weeklyStr
   const [weeklyStreak, setWeeklyStreak] = useState(0);
 
   useEffect(() => {
+    capturePartnerCodeFromUrl();
     const inviteToken = new URLSearchParams(window.location.search).get("cycleInvite");
     if (inviteToken && /^[0-9a-f-]{36}$/i.test(inviteToken)) {
       try {

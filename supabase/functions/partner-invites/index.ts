@@ -1,7 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { buildInviteLink, INVITE_EXPIRY_DAYS, renderInviteEmail, resolveInviterName } from "../_shared/partnerInvite.ts";
 
 const EIGHT_CHARACTER_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const RESEND_API_URL = "https://api.resend.com/emails";
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL")?.trim() || "PhaseTwo <mail@phasetwo.space>";
 
 type InviteRequest = {
   action?: "create" | "status" | "resend" | "revoke";
@@ -44,10 +46,11 @@ function isValidEmail(value: string): boolean {
 }
 
 function generateInviteCode(): string {
+  // 32-character alphabet divides 256 evenly, so a random byte maps without bias.
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
   let code = "";
-  for (let index = 0; index < 8; index += 1) {
-    code += EIGHT_CHARACTER_CODE_CHARS[Math.floor(Math.random() * EIGHT_CHARACTER_CODE_CHARS.length)];
-  }
+  for (const byte of bytes) code += EIGHT_CHARACTER_CODE_CHARS[byte % EIGHT_CHARACTER_CODE_CHARS.length];
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
@@ -65,23 +68,36 @@ async function findOwnerInvite(serviceClient: ReturnType<typeof createClient>, o
   return data as InviteRow | null;
 }
 
-async function sendInviteEmail(code: string, email: string, expiresAt: string): Promise<void> {
+async function inviterName(
+  serviceClient: ReturnType<typeof createClient>,
+  user: { id: string; user_metadata?: Record<string, unknown> | null },
+): Promise<string> {
+  const [profile, state] = await Promise.all([
+    serviceClient.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
+    serviceClient.from("user_app_state").select("cycle_profile, app_settings").eq("user_id", user.id).maybeSingle(),
+  ]);
+  const metadata = user.user_metadata ?? {};
+  return resolveInviterName({
+    profileDisplayName: profile.data?.display_name,
+    appDisplayName: (state.data?.app_settings as Record<string, unknown> | null)?.displayName,
+    metadataName: metadata.full_name ?? metadata.name,
+    ownerLabel: (state.data?.cycle_profile as Record<string, unknown> | null)?.ownerLabel,
+  });
+}
+
+async function sendInviteEmail(inviter: string, code: string, email: string): Promise<void> {
   const resendKey = Deno.env.get("RESEND_API_KEY")?.trim();
   if (!resendKey) throw new Error("email_not_configured");
 
+  const link = buildInviteLink(Deno.env.get("APP_URL") ?? "", code);
+  const message = renderInviteEmail({ inviter, code, link, expiryDays: INVITE_EXPIRY_DAYS });
   const response = await fetch(RESEND_API_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${resendKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      from: "PhaseTwo <mail@phasetwo.space>",
-      to: [email],
-      subject: "Your PhaseTwo partner code",
-      text: `Your PhaseTwo partner code is ${code}. Share it with your partner. It expires at ${new Date(expiresAt).toISOString()} and can be used once.`,
-      html: `<h1>Your PhaseTwo partner code</h1><p>Use this code to link your PhaseTwo account:</p><p><strong>${code}</strong></p><p>It expires on ${new Date(expiresAt).toLocaleString()} and can be used once.</p>`,
-    }),
+    body: JSON.stringify({ from: FROM_EMAIL, to: [email], subject: message.subject, text: message.text, html: message.html }),
   });
 
   if (!response.ok) throw new Error("email_failed");
@@ -122,8 +138,17 @@ Deno.serve(async (request: Request) => {
     const action = body.action ?? "create";
     if (action === "status") {
       const invite = await findOwnerInvite(serviceClient, user.id);
+      const linkedRow = await serviceClient
+        .from("cycle_invitations")
+        .select("id")
+        .eq("owner_user_id", user.id)
+        .not("accepted_user_id", "is", null)
+        .limit(1)
+        .maybeSingle();
+      if (linkedRow.error) throw linkedRow.error;
       return json(request, 200, {
         ok: true,
+        linked: Boolean(linkedRow.data),
         invitation: invite ? {
           email: invite.invited_email,
           code: invite.invite_code,
@@ -136,25 +161,33 @@ Deno.serve(async (request: Request) => {
       const { error } = await serviceClient
         .from("cycle_invitations")
         .delete()
-        .eq("owner_user_id", user.id)
-        .is("accepted_user_id", null);
+        .eq("owner_user_id", user.id);
       if (error) return json(request, 500, { error: "invite_failed" });
       return json(request, 200, { ok: true });
+    }
+
+    if (action === "resend") {
+      const invite = await findOwnerInvite(serviceClient, user.id);
+      if (!invite) return json(request, 404, { error: "invite_failed" });
+      let expiresAt = invite.expires_at;
+      if (new Date(expiresAt).getTime() <= Date.now()) {
+        expiresAt = new Date(Date.now() + INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+        const { error } = await serviceClient.from("cycle_invitations").update({ expires_at: expiresAt }).eq("id", invite.id);
+        if (error) return json(request, 500, { error: "invite_failed" });
+      }
+      try {
+        // Always send to the address stored on the invitation, never one supplied by the client.
+        await sendInviteEmail(await inviterName(serviceClient, user), invite.invite_code, invite.invited_email);
+        return json(request, 200, { ok: true, expires_at: expiresAt });
+      } catch (error) {
+        if (error instanceof Error && error.message === "email_not_configured") return json(request, 500, { error: "email_not_configured" });
+        return json(request, 500, { error: "email_failed" });
+      }
     }
 
     const email = normalizeEmail(body.email);
     if (!isValidEmail(email)) return json(request, 400, { error: "invalid_email" });
     if (email === user.email?.toLowerCase()) return json(request, 409, { error: "cannot_invite_self" });
-
-    const pending = await serviceClient
-      .from("cycle_invitations")
-      .select("id")
-      .eq("owner_user_id", user.id)
-      .is("accepted_user_id", null)
-      .limit(1)
-      .maybeSingle();
-    if (pending.error) throw pending.error;
-    if (pending.data) return json(request, 409, { error: "already_linked" });
 
     const active = await serviceClient
       .from("cycle_invitations")
@@ -166,19 +199,21 @@ Deno.serve(async (request: Request) => {
     if (active.error) throw active.error;
     if (active.data) return json(request, 409, { error: "already_linked" });
 
+    const pending = await findOwnerInvite(serviceClient, user.id);
+    const expiresAt = new Date(Date.now() + INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
     let inviteCode = generateInviteCode();
-    let inviteCreated = false;
-    while (!inviteCreated) {
-      const { error: insertError } = await serviceClient
-        .from("cycle_invitations")
-        .insert({
-          owner_user_id: user.id,
-          invited_email: email,
-          invite_code: inviteCode,
-          expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        });
-      if (!insertError) inviteCreated = true;
-      else if (insertError.code !== "23505") throw insertError;
+    let inviteSaved = false;
+    while (!inviteSaved) {
+      const { error: saveError } = pending
+        ? await serviceClient
+          .from("cycle_invitations")
+          .update({ invited_email: email, invite_code: inviteCode, invite_token: crypto.randomUUID(), expires_at: expiresAt })
+          .eq("id", pending.id)
+        : await serviceClient
+          .from("cycle_invitations")
+          .insert({ owner_user_id: user.id, invited_email: email, invite_code: inviteCode, expires_at: expiresAt });
+      if (!saveError) inviteSaved = true;
+      else if (saveError.code !== "23505") throw saveError;
       else inviteCode = generateInviteCode();
     }
 
@@ -186,7 +221,7 @@ Deno.serve(async (request: Request) => {
     if (!invite) return json(request, 500, { error: "invite_failed" });
 
     try {
-      await sendInviteEmail(invite.invite_code, invite.invited_email, invite.expires_at);
+      await sendInviteEmail(await inviterName(serviceClient, user), invite.invite_code, invite.invited_email);
       return json(request, 200, { ok: true, expires_at: invite.expires_at });
     } catch (error) {
       if (error instanceof Error && error.message === "email_not_configured") return json(request, 500, { error: "email_not_configured" });

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import type { AppSettings, CycleProfile, ThemeMode } from "../types";
 import { MEDICAL_DISCLAIMER } from "../lib/endoContent";
 import { editPeriodStart } from "../lib/cycleUtils";
 import { supabase } from "../lib/supabase";
 import { PartnerInvitationPanel } from "./PartnerInvitationPanel";
+import { formatInviteCode, mapPartnerAcceptError } from "../lib/partnerInvite";
 import { SaveChangesButton } from "./SaveChangesButton";
 import { enableReminders, reminderSupport, type ReminderSupport } from "../lib/notifications";
 
@@ -15,6 +16,8 @@ export function SettingsView({
   isLinkedPartner,
   onLeavePartnerSync,
   onPartnerLinked,
+  initialPartnerCode,
+  onInitialPartnerCodeUsed,
   profile,
   onProfileChange,
   onDeleteAccount,
@@ -28,6 +31,8 @@ export function SettingsView({
   isLinkedPartner: boolean;
   onLeavePartnerSync: () => Promise<void>;
   onPartnerLinked: () => Promise<void>;
+  initialPartnerCode?: string | null;
+  onInitialPartnerCodeUsed?: () => void;
   profile: CycleProfile;
   onProfileChange: (profile: CycleProfile) => void;
   onDeleteAccount: () => Promise<void>;
@@ -45,6 +50,39 @@ export function SettingsView({
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState("");
   const [linkNotice, setLinkNotice] = useState("");
+  // Choosing "I view an invited partner's cycle" before linking opens the code entry instead of being blocked.
+  const [partnerIntent, setPartnerIntent] = useState(false);
+  const partnerCodeInput = useRef<HTMLInputElement>(null);
+  const viewingPartner = settings.role === "partner" || (!isLinkedPartner && partnerIntent);
+
+  useEffect(() => {
+    if (!initialPartnerCode) return;
+    setPartnerIntent(true);
+    setPartnerCode(formatInviteCode(initialPartnerCode));
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("partner-code-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      partnerCodeInput.current?.focus({ preventScroll: true });
+      onInitialPartnerCodeUsed?.();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialPartnerCode]);
+
+  function chooseSelf() {
+    setPartnerIntent(false);
+    onSettingsChange({ ...settings, role: "self" });
+  }
+
+  function choosePartner() {
+    if (isLinkedPartner) {
+      onSettingsChange({ ...settings, role: "partner", ldrEnabled: true });
+      return;
+    }
+    setPartnerIntent(true);
+    window.requestAnimationFrame(() => {
+      document.getElementById("partner-code-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      partnerCodeInput.current?.focus({ preventScroll: true });
+    });
+  }
   const [reminderPermission, setReminderPermission] = useState<ReminderSupport>(reminderSupport());
 
   async function toggleReminders(on: boolean) {
@@ -115,17 +153,17 @@ export function SettingsView({
             <fieldset>
               <legend className="text-xs font-medium text-zinc-500">How are you using PhaseTwo?</legend>
               <div className="mt-2 grid gap-2">
-                <label className="flex items-start gap-3 rounded-lg border border-sage bg-sage-light/50 p-3">
-                  <input type="radio" name="tracking-role" checked={settings.role === "self"} onChange={() => onSettingsChange({ ...settings, role: "self" })} className="mt-0.5 accent-[#4A6B5D]" />
+                <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${!viewingPartner ? "border-sage bg-sage-light/50" : "border-zinc-200 hover:bg-zinc-50"}`}>
+                  <input type="radio" name="tracking-role" checked={!viewingPartner} onChange={chooseSelf} className="mt-0.5 accent-[#4A6B5D]" />
                   <span><span className="block text-sm font-medium text-zinc-800">I track my own cycle</span><span className="mt-0.5 block text-xs text-zinc-500">Your period and symptom history stay in this account.</span></span>
                 </label>
-                <label className={`flex items-start gap-3 rounded-lg border p-3 ${isLinkedPartner ? "border-sage bg-sage-light/50" : "border-zinc-200 opacity-60"}`}>
-                  <input type="radio" name="tracking-role" checked={settings.role === "partner"} disabled={!isLinkedPartner} onChange={() => onSettingsChange({ ...settings, role: "partner", ldrEnabled: true })} className="mt-0.5 accent-[#4A6B5D]" />
-                  <span><span className="block text-sm font-medium text-zinc-800">I view an invited partner’s cycle</span><span className="mt-0.5 block text-xs text-zinc-500">Requires an invitation accepted by this account’s email.</span></span>
+                <label className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${viewingPartner ? "border-sage bg-sage-light/50" : "border-zinc-200 hover:bg-zinc-50"}`}>
+                  <input type="radio" name="tracking-role" checked={viewingPartner} onChange={choosePartner} className="mt-0.5 accent-[#4A6B5D]" />
+                  <span><span className="block text-sm font-medium text-zinc-800">I view an invited partner’s cycle</span><span className="mt-0.5 block text-xs text-zinc-500">{isLinkedPartner ? "Your partner’s cycle is linked to this account." : "Enter the code from your partner’s invitation email to link their cycle."}</span></span>
                 </label>
               </div>
             </fieldset>
-            {settings.role === "self" && <>
+            {!viewingPartner && <>
               <label className="block text-xs font-medium text-zinc-600">Name to display<input value={profile.ownerLabel} onChange={(event) => onProfileChange({ ...profile, ownerLabel: event.target.value })} maxLength={80} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
               <label className="block text-xs font-medium text-zinc-600">Most recent period start<input type="date" value={profile.lastPeriodStart} onChange={(event) => { if (event.target.value) onProfileChange(editPeriodStart(profile, profile.lastPeriodStart, event.target.value)); }} className="mt-1.5 min-h-11 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
               <label className="block text-xs font-medium text-zinc-600">Cycle length (days)<input type="number" min={20} max={45} value={profile.cycleLength} onChange={(event) => onProfileChange({ ...profile, cycleLength: Math.max(20, Math.min(45, Number(event.target.value) || 28)) })} className="mt-1.5 min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm" /></label>
@@ -135,9 +173,10 @@ export function SettingsView({
         </section>
 
         <div className="space-y-6">
-          {settings.role === "self" && isAuthenticated && <PartnerInvitationPanel />}
+          {!viewingPartner && isAuthenticated && <PartnerInvitationPanel />}
           {settings.role === "partner" && isLinkedPartner && <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6"><h2 className="font-display text-base font-semibold text-zinc-900">Partner sync</h2><p className="mt-2 text-xs leading-relaxed text-zinc-600">This account can view the cycle dates and length shared by your partner. Their symptom logs, notes, and account data remain private.</p><button type="button" disabled={leavingSync} onClick={() => { setLeavingSync(true); setSyncError(""); void onLeavePartnerSync().catch(() => setSyncError("Partner sync could not be disconnected. Please try again.")).finally(() => setLeavingSync(false)); }} className="mt-3 min-h-9 rounded-md border border-zinc-300 px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50">{leavingSync ? "Disconnecting…" : "Disconnect partner sync"}</button>{syncError && <p role="alert" className="mt-2 text-xs text-rose-700">{syncError}</p>}</section>}
-          {isAuthenticated && settings.role === "self" && !isLinkedPartner && <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6">
+          {!isLinkedPartner && viewingPartner && !isAuthenticated && <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6"><h2 className="font-display text-base font-semibold text-zinc-900">Enter a partner code</h2><p className="mt-1 text-xs leading-relaxed text-zinc-600">Sign in first, then enter the code from your partner’s invitation email.</p></section>}
+          {isAuthenticated && !isLinkedPartner && <section id="partner-code-section" className={`rounded-xl border bg-white p-5 shadow-card sm:p-6 ${viewingPartner ? "border-sage" : "border-zinc-200"}`}>
             <h2 className="font-display text-base font-semibold text-zinc-900">Enter a partner code</h2>
             <p className="mt-1 text-xs leading-relaxed text-zinc-600">Your partner shares the code from their invitation email. It can be used once and expires after 14 days.</p>
             <form className="mt-4 space-y-3" onSubmit={async (event) => {
@@ -147,14 +186,15 @@ export function SettingsView({
               const { error } = await supabase.rpc("accept_cycle_invitation", { p_code: partnerCode });
               setLinking(false);
               if (error) {
-                setLinkError(error.message || "That invite code could not be accepted.");
+                setLinkError(mapPartnerAcceptError(error.message));
                 return;
               }
               setLinkNotice("Partner cycle linked. Your account can now view the shared cycle.");
               setPartnerCode("");
+              setPartnerIntent(false);
               await onPartnerLinked();
             }}>
-              <input value={partnerCode} onChange={(event) => setPartnerCode(event.target.value)} placeholder="K7M2-QX9P" autoComplete="one-time-code" maxLength={9} className="min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm uppercase placeholder:text-zinc-400 focus:border-sage focus:outline-none" />
+              <input ref={partnerCodeInput} value={partnerCode} onChange={(event) => setPartnerCode(event.target.value)} placeholder="K7M2-QX9P" autoComplete="one-time-code" maxLength={9} className="min-h-10 w-full rounded-md border border-zinc-200 px-3 text-sm uppercase placeholder:text-zinc-400 focus:border-sage focus:outline-none" />
               <button type="submit" disabled={linking || partnerCode.trim().length === 0} className="inline-flex min-h-10 items-center justify-center rounded-md bg-sage-dark px-4 text-sm font-medium text-white disabled:opacity-50">{linking ? "Linking…" : "Accept partner code"}</button>
               {linkError && <p role="alert" className="text-xs text-rose-700">{linkError}</p>}
               {linkNotice && <p role="status" className="text-xs text-sage-dark">{linkNotice}</p>}

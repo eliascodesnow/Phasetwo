@@ -7,6 +7,7 @@ type Invitation = { email: string; code: string; expires_at: string };
 
 type PartnerInviteResult = {
   ok?: boolean;
+  linked?: boolean;
   expires_at?: string;
   error?: string;
   invitation?: Invitation | null;
@@ -15,6 +16,7 @@ type PartnerInviteResult = {
 export function PartnerInvitationPanel() {
   const [email, setEmail] = useState("");
   const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [linked, setLinked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
@@ -28,6 +30,7 @@ export function PartnerInvitationPanel() {
       return;
     }
     setInvitation(data?.invitation ?? null);
+    setLinked(Boolean(data?.linked));
   }
 
   useEffect(() => {
@@ -76,8 +79,8 @@ export function PartnerInvitationPanel() {
   }
 
   async function revokeInvite() {
-    if (!supabase || !invitation || busy) return;
-    if (!window.confirm("Revoke this invitation?")) return;
+    if (!supabase || (!invitation && !linked) || busy) return;
+    if (!window.confirm(linked ? "Stop sharing your cycle with your partner?" : "Revoke this invitation?")) return;
     setBusy(true);
     setError("");
     const { data, error } = await supabase.functions.invoke<PartnerInviteResult>("partner-invites", { body: { action: "revoke" } });
@@ -89,6 +92,7 @@ export function PartnerInvitationPanel() {
       return;
     }
     setInvitation(null);
+    setLinked(false);
     setNotice("Partner access has been removed.");
   }
 
@@ -98,11 +102,17 @@ export function PartnerInvitationPanel() {
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage-light text-sage-dark"><MailPlus className="h-4 w-4" /></div>
         <div className="min-w-0 flex-1">
           <h2 className="font-display text-base font-semibold text-zinc-900">Partner sync</h2>
-          <p className="mt-1 text-xs leading-relaxed text-zinc-600">Invite by account email, then share the single-use code. The code expires after 14 days.</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-600">{linked ? "Your cycle dates are shared with your partner. Symptom logs and notes stay private." : "Invite by account email. They get an email with your name, a link and a single-use code that expires after 14 days."}</p>
         </div>
       </div>
 
-      {invitation ? (
+      {linked ? (
+        <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+          <p className="text-sm font-medium text-zinc-800">Partner linked</p>
+          <p className="mt-1 text-xs text-zinc-500">They can see your cycle dates and length. You can stop sharing at any time.</p>
+          <div className="mt-3"><button type="button" onClick={() => void revokeInvite()} disabled={busy} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-zinc-300 px-3 text-xs text-zinc-600 hover:bg-white disabled:opacity-50"><X className="h-3.5 w-3.5" />Stop sharing</button></div>
+        </div>
+      ) : invitation ? (
         <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
           <p className="text-sm font-medium text-zinc-800">Invitation for {invitation.email}</p>
           <p className="mt-1 text-xs text-zinc-500">Expires {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(invitation.expires_at))}</p>
