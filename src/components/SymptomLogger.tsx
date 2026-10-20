@@ -496,7 +496,7 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
               PhaseTwo stores your daily pain, location, symptoms, bleeding, impact, and optional notes in your personal cycle log so you can spot patterns over time.
             </p>
             <p className="mt-3 text-sm leading-6 text-zinc-700">
-              This is only stored with your account for cycle tracking. You can review the privacy policy here: <a href="#" className="font-medium text-sage underline underline-offset-2">Privacy policy</a>.
+              This is only stored with your account for cycle tracking. You can review the privacy policy here: <a href="/privacy" target="_blank" rel="noopener noreferrer" className="font-medium text-sage underline underline-offset-2">Privacy policy</a>.
             </p>
 
             <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">

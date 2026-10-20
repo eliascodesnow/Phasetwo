@@ -16,6 +16,8 @@ import { SettingsView } from "./components/SettingsView";
 import { PartnerAdviceLauncher } from "./components/PartnerAdviceLauncher";
 import { AskBellaLauncher } from "./components/AskBellaLauncher";
 import { AuthGate } from "./components/AuthGate";
+import { LegalConsentGate } from "./components/LegalConsentGate";
+import { PRIVACY_URL, syncLegalAcceptance, TERMS_URL } from "./lib/legal";
 import { supabase } from "./lib/supabase";
 import { clearLocalUserData, LOCAL_GUEST_ID, loadLocalAppState, saveLocalAppState, type UserAppState } from "./lib/storage";
 import { loadSyncedAppState, saveSyncedAppState } from "./lib/userData";
@@ -35,12 +37,24 @@ const WORKSPACE_TABS: Array<{ key: WorkspaceView; label: string; icon: typeof Ho
   { key: "settings", label: "Settings", icon: Settings },
 ];
 
+function LegalAcceptanceSync({ userId }: { userId: string | null }) {
+  useEffect(() => {
+    if (userId) void syncLegalAcceptance(userId);
+  }, [userId]);
+  return null;
+}
+
 export default function App() {
   return (
-    <>
-      <AuthGate>{(user, weeklyLoginStreak) => <WorkspaceApp key={user?.id ?? LOCAL_GUEST_ID} userId={user?.id ?? LOCAL_GUEST_ID} isAuthenticated={Boolean(user)} weeklyLoginStreak={weeklyLoginStreak} />}</AuthGate>
+    <LegalConsentGate>
+      <AuthGate>{(user, weeklyLoginStreak) => (
+        <>
+          <LegalAcceptanceSync userId={user?.id ?? null} />
+          <WorkspaceApp key={user?.id ?? LOCAL_GUEST_ID} userId={user?.id ?? LOCAL_GUEST_ID} isAuthenticated={Boolean(user)} weeklyLoginStreak={weeklyLoginStreak} />
+        </>
+      )}</AuthGate>
       <Analytics />
-    </>
+    </LegalConsentGate>
   );
 }
 
@@ -388,6 +402,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
       <footer className="max-w-6xl mx-auto px-6 sm:px-10 py-8 text-xs text-zinc-400">
         {isAuthenticated ? "Your cycle, plans, and symptom history stay in your account." : "Your cycle, plans, and symptom history stay on this device."} Partner sync is invitation-only; Bella conversations stay in this session.
+        <span className="ml-2 whitespace-nowrap"><a href={PRIVACY_URL} className="underline underline-offset-2 hover:text-zinc-600">Privacy Policy</a> · <a href={TERMS_URL} className="underline underline-offset-2 hover:text-zinc-600">Terms of Service</a></span>
         {syncError && <span role="status" className="ml-2 text-red-700">Sync issue: {syncError}</span>}
       </footer>
 
