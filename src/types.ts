@@ -56,4 +56,6 @@ export interface AppSettings {
   personalDetailsPromptSeen?: boolean;
   /** Notify 2 days and 1 day before the predicted period. */
   periodReminders?: boolean;
+  /** True once the user has finished or skipped the app tour. */
+  tourCompleted?: boolean;
 }

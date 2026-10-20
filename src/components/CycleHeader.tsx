@@ -65,7 +65,7 @@ function CycleChart({ profile, day, phaseKey }: { profile: CycleProfile; day: nu
   const labelX = Math.min(88, Math.max(12, todayX));
 
   return (
-    <div className="mt-6">
+    <div className="mt-6" data-tour="cycle-chart">
       {/* Phase names, sized to match the bands below. */}
       <div className="flex text-[11px] font-medium text-zinc-500" aria-hidden="true">
         {segments.map((segment) => (

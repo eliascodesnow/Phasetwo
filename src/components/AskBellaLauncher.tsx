@@ -203,7 +203,7 @@ export function AskBellaLauncher({ isAuthenticated, onSignIn }: { isAuthenticate
           </div>
         </section>
       )}
-      <button type="button" aria-expanded={open} aria-label="Ask Bella" onClick={() => setOpen((current) => !current)} className="inline-flex min-h-12 items-center gap-2 rounded-full border border-[#416353]/20 bg-white px-4 py-1.5 text-sm font-semibold text-zinc-900 shadow-lg transition-transform hover:-translate-y-0.5 hover:shadow-xl">
+      <button type="button" data-tour="ask-bella" aria-expanded={open} aria-label="Ask Bella" onClick={() => setOpen((current) => !current)} className="inline-flex min-h-12 items-center gap-2 rounded-full border border-[#416353]/20 bg-white px-4 py-1.5 text-sm font-semibold text-zinc-900 shadow-lg transition-transform hover:-translate-y-0.5 hover:shadow-xl">
         Ask Bella
         <MessageCircle className="h-4 w-4 text-sage" />
       </button>

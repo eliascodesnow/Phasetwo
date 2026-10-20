@@ -125,6 +125,14 @@ html[data-theme="dark"] .border-white {
   border-color: var(--zinc-200);
 }
 
+/* App tour spotlight: glides between targets. Reduced-motion users get the global 0ms override. */
+.tour-ring,
+.tour-card {
+  transition-property: left, top, width, height, opacity;
+  transition-duration: 240ms;
+  transition-timing-function: ease;
+}
+
 .bg-sage {
   background-color: var(--accent-button);
 }
