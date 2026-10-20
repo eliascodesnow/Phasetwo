@@ -269,7 +269,7 @@ export function SymptomLogger({ profile, userId, initialLogDate, onHistoryChange
 
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 shadow-card">
-      <div className="flex items-start justify-between gap-3 pb-4">
+      <div data-tour="check-in" className="flex items-start justify-between gap-3 pb-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sage-light text-sage">
             <HeartPulse className="h-4 w-4" strokeWidth={2.1} />

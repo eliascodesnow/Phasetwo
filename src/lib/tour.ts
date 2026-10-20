@@ -1,177 +1,142 @@
-export type TourView = "today" | "calendar" | "planner" | "history" | "report" | "settings";
 export type TourRole = "self" | "partner";
-export type TourIcon =
-  | "welcome" | "chart" | "period" | "checkin" | "calendar" | "planner" | "history"
-  | "report" | "bella" | "patterns" | "partner" | "settings" | "done";
+
+/** Keeps the tour short. Enforced by a test. */
+export const MAX_TOUR_STEPS = 7;
+
+export type TourRowIcon = "calendar" | "planner" | "history" | "report" | "settings";
+
+export interface TourRow {
+  icon: TourRowIcon;
+  label: string;
+  text: string;
+}
 
 export interface TourStep {
   id: string;
   title: string;
+  /** One or two short sentences about how the highlighted button or area works. */
   body: string;
-  /** Short bullet points shown under the body. */
-  points?: string[];
-  /** The screen shown behind the tour while this step is open. */
-  view: TourView;
-  icon: TourIcon;
-  /** Who sees the step. Defaults to everyone. */
-  audience?: TourRole;
+  /** Short extra lines under the body. */
+  tips?: string[];
+  /** One row per button, for a step that points at a group of buttons. */
+  rows?: TourRow[];
+  /**
+   * The `data-tour` value of the element this step points at. If that element is not on screen,
+   * the step is shown as a centred card instead.
+   */
+  target: string;
+  /** Who sees the step. */
+  audience: TourRole;
 }
 
 export const TOUR_STEPS: TourStep[] = [
+  // People tracking their own cycle
   {
-    id: "welcome",
-    title: "Welcome to PhaseTwo",
-    body: "PhaseTwo helps you understand your cycle, log how you feel, and prepare for appointments. This tour takes about a minute. You can skip it at any time and replay it from Settings.",
-    view: "today",
-    icon: "welcome",
+    id: "log-period",
+    title: "Start here: log your period",
+    body: "Tap Period started on the first day of bleeding. It records today and updates your predicted next period.",
+    tips: [
+      "Missed a day? Open Calendar, tap that date, then tap Record period start.",
+      "Entered the wrong date? Edit or remove it in History.",
+    ],
+    target: "record-period",
+    audience: "self",
   },
   {
     id: "chart",
     title: "Your cycle at a glance",
-    body: "The chart on Today shows where you are in your cycle. The coloured bands are the four phases, the curve is typical energy, and the Today marker shows your current day.",
-    points: [
-      "Your estimated next period date and a countdown sit at the top right.",
-      "Until you log a real period start, the chart uses a default 28-day cycle, so treat it as an estimate.",
-      "Phases are a loose reference. Everyone's cycle is different.",
-    ],
-    view: "today",
-    icon: "chart",
-    audience: "self",
-  },
-  {
-    id: "log-period",
-    title: "How to log your period",
-    body: "Log the first day of bleeding. Every start you record makes your predictions more personal.",
-    points: [
-      "Fastest: tap Record period on Today to log a start for today.",
-      "Missed a day? Tap the date on the calendar (today or earlier), then tap Record period start.",
-      "Made a mistake? Edit or remove a period start in History, or change your most recent date in Settings.",
-      "Your cycle length is averaged from your last six recorded cycles.",
-    ],
-    view: "today",
-    icon: "period",
+    body: "The coloured bands are your four phases, the curve is typical energy, and the Today marker shows where you are now.",
+    tips: ["It starts from a default 28-day cycle and gets more personal with every period you log."],
+    target: "cycle-chart",
     audience: "self",
   },
   {
     id: "check-in",
     title: "Daily check-in",
-    body: "Under the calendar, record how you feel: pain from 0 to 10, bleeding, other symptoms, optional pain locations and notes. Pick a date to fill in a day you missed.",
-    points: [
-      "Save your check-in to add it to your history.",
-      "Check-ins are private to your account, or to this device if you are not signed in.",
+    body: "Rate your pain from 0 to 10, add bleeding and symptoms, then tap Save. Pick another date to fill in a day you missed.",
+    tips: ["Check-ins are private to your account, or to this device if you are not signed in."],
+    target: "check-in",
+    audience: "self",
+  },
+  {
+    id: "tabs",
+    title: "Move around",
+    body: "These buttons switch between the main screens.",
+    rows: [
+      { icon: "calendar", label: "Calendar", text: "Period days and estimates. Tap a past date, then Record period start." },
+      { icon: "planner", label: "Planner", text: "Tasks matched to the phase that suits them." },
+      { icon: "history", label: "History", text: "Edit or delete period starts and check-ins." },
+      { icon: "report", label: "Report", text: "A summary to print or share with your doctor." },
     ],
-    view: "today",
-    icon: "checkin",
-    audience: "self",
-  },
-  {
-    id: "calendar",
-    title: "Calendar",
-    body: "See recorded period days, estimated upcoming days, and the days you logged pain. Tap any day to see its details.",
-    points: ["Estimated days are a guide based on your past cycles, not a forecast."],
-    view: "calendar",
-    icon: "calendar",
-    audience: "self",
-  },
-  {
-    id: "planner",
-    title: "Planner",
-    body: "Add tasks and see which cycle phase usually suits each one best. Suggestions are flexible, so move things whenever you like.",
-    view: "planner",
-    icon: "planner",
-  },
-  {
-    id: "history",
-    title: "History",
-    body: "Your period starts and daily check-ins in one place. Tap a check-in to edit it, or edit or remove a period start.",
-    view: "history",
-    icon: "history",
-    audience: "self",
-  },
-  {
-    id: "report",
-    title: "Health report",
-    body: "A summary of your recorded cycle and symptom history that you can print or download and share with your doctor. Review it before sharing.",
-    points: ["On your phone, find it under More, then Health report."],
-    view: "report",
-    icon: "report",
+    target: "nav",
     audience: "self",
   },
   {
     id: "bella",
     title: "Ask Bella",
-    body: "The Ask Bella button at the bottom right answers menstrual health questions. It offers information, not a diagnosis.",
-    points: [
-      "When a question needs personal context, Bella sees only recent structured symptom entries and pattern counts.",
-      "Your notes and account details are never sent to Bella.",
-    ],
-    view: "today",
-    icon: "bella",
-    audience: "self",
-  },
-  {
-    id: "patterns",
-    title: "Patterns worth discussing",
-    body: "At the bottom of Today, PhaseTwo highlights patterns in your logs, such as pain that is getting worse over several cycles, and helps you prepare an appointment summary to download.",
-    points: ["This is awareness to take to a clinician, not a diagnosis."],
-    view: "today",
-    icon: "patterns",
-    audience: "self",
-  },
-  {
-    id: "partner-cycle",
-    title: "Your partner's cycle",
-    body: "Today shows your partner's cycle: the current phase and the estimated next period.",
-    points: [
-      "Only cycle dates and length are shared with you.",
-      "Their symptom logs, notes and account data stay private.",
-    ],
-    view: "today",
-    icon: "partner",
-    audience: "partner",
-  },
-  {
-    id: "partner-support",
-    title: "Remote sync and partner advice",
-    body: "Remote sync shows ideas for supporting your partner today. The Partner advice button opens a chat for more suggestions.",
-    points: ["These are suggestions, not predictions of how your partner feels. Ask what would feel good."],
-    view: "today",
-    icon: "partner",
-    audience: "partner",
-  },
-  {
-    id: "partner-sync",
-    title: "Partner sync",
-    body: "In Settings, invite your partner by account email and share the single-use code. It expires after 14 days. Once they enter it, they can see your cycle dates and length.",
-    points: [
-      "Your symptom logs, notes and account data stay private.",
-      "You need to be signed in to send an invitation.",
-    ],
-    view: "settings",
-    icon: "partner",
+    body: "Tap this bubble to ask a menstrual-health question or prepare for an appointment.",
+    tips: ["Bella shares information, not a diagnosis. Your notes are never sent to her."],
+    target: "ask-bella",
     audience: "self",
   },
   {
     id: "settings",
-    title: "Reminders and settings",
-    body: "Turn on Period reminders to get a notification 2 days and 1 day before your predicted period. You can also change the theme here, and your cycle length and period duration if you track your own cycle.",
-    points: [
+    title: "Settings and reminders",
+    body: "Turn on Period reminders to get a notification 2 days and 1 day before your period.",
+    tips: [
+      "Invite a partner to see your cycle dates, change the theme, or replay this tour here.",
       "Reminders appear when PhaseTwo is installed or open on this device.",
-      "Replay this tour from Settings whenever you like.",
     ],
-    view: "settings",
-    icon: "settings",
+    target: "tab-settings",
+    audience: "self",
+  },
+
+  // People viewing an invited partner's cycle
+  {
+    id: "partner-cycle",
+    title: "Your partner's cycle",
+    body: "This shows their current phase and estimated next period.",
+    tips: ["Only cycle dates and length are shared with you. Their symptom logs and notes stay private."],
+    target: "cycle-chart",
+    audience: "partner",
   },
   {
-    id: "done",
-    title: "You're all set",
-    body: "Start by recording your most recent period: tap Record period on Today.",
-    view: "today",
-    icon: "done",
+    id: "partner-sync",
+    title: "Remote sync",
+    body: "See both your local times and ideas for supporting your partner today.",
+    tips: ["These are suggestions, not predictions of how they feel. Ask what would feel good."],
+    target: "ldr",
+    audience: "partner",
+  },
+  {
+    id: "partner-advice",
+    title: "Partner advice",
+    body: "Tap this button to chat about more ways to support your partner through this phase.",
+    target: "partner-advice",
+    audience: "partner",
+  },
+  {
+    id: "partner-tabs",
+    title: "Move around",
+    body: "These buttons switch between the main screens.",
+    rows: [
+      { icon: "calendar", label: "Calendar", text: "Your partner's estimated period days." },
+      { icon: "planner", label: "Planner", text: "Plan your own tasks around the phase that suits them." },
+    ],
+    target: "nav",
+    audience: "partner",
+  },
+  {
+    id: "partner-settings",
+    title: "Settings and reminders",
+    body: "Turn on Period reminders to be told 2 days and 1 day before your partner's predicted period.",
+    tips: ["You can also change the theme, disconnect partner sync, or replay this tour here."],
+    target: "tab-settings",
+    audience: "partner",
   },
 ];
 
-/** The steps a given user should see: shared steps plus the ones for their role. */
+/** The steps a given user should see. */
 export function tourStepsFor(role: TourRole): TourStep[] {
-  return TOUR_STEPS.filter((step) => !step.audience || step.audience === role);
+  return TOUR_STEPS.filter((step) => step.audience === role);
 }

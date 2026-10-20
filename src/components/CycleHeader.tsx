@@ -65,16 +65,20 @@ function CycleChart({ profile, day, phaseKey }: { profile: CycleProfile; day: nu
   const labelX = Math.min(88, Math.max(12, todayX));
 
   return (
-    <div className="mt-6">
+    <div className="mt-6" data-tour="cycle-chart">
       {/* Phase names, sized to match the bands below. */}
-      <div className="flex text-[11px] font-medium text-zinc-500" aria-hidden="true">
+      <div className="flex font-medium text-zinc-500" aria-hidden="true">
         {segments.map((segment) => (
           <span
             key={`${segment.key}-${segment.start}`}
-            className={`truncate pb-1.5 pl-1 ${segment.key === phaseKey ? "font-semibold text-zinc-900" : ""}`}
+            className={`overflow-hidden whitespace-nowrap pb-1.5 pl-1 text-[10px] sm:text-[11px] ${segment.key === phaseKey ? "font-semibold text-zinc-900" : ""}`}
             style={{ width: `${(segment.days / cycleLength) * 100}%` }}
           >
-            {segment.days / cycleLength > 0.12 ? PHASES.find((p) => p.key === segment.key)?.label : ""}
+            {segment.days / cycleLength > 0.12 ? (
+              segment.key === "menstrual"
+                ? <><span className="sm:hidden">Period</span><span className="hidden sm:inline">Menstrual</span></>
+                : PHASES.find((p) => p.key === segment.key)?.label
+            ) : ""}
           </span>
         ))}
       </div>
@@ -104,14 +108,14 @@ function CycleChart({ profile, day, phaseKey }: { profile: CycleProfile; day: nu
         </svg>
 
         {/* Today marker lives in HTML so it stays round whatever the chart width. */}
-        <span className="pointer-events-none absolute inset-y-0 w-px -translate-x-1/2 bg-zinc-900/25" style={{ left: `${todayX}%` }} aria-hidden="true" />
+        <span className="pointer-events-none absolute inset-y-0 w-px -translate-x-1/2" style={{ left: `${todayX}%`, backgroundColor: "var(--zinc-400)", opacity: 0.6 }} aria-hidden="true" />
         <span
-          className="pointer-events-none absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
-          style={{ left: `${todayX}%`, top: `${(todayY / CHART_HEIGHT) * 100}%`, backgroundColor: activeLine }}
+          className="pointer-events-none absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow"
+          style={{ left: `${todayX}%`, top: `${(todayY / CHART_HEIGHT) * 100}%`, backgroundColor: activeLine, borderColor: "var(--color-surface)" }}
           aria-hidden="true"
         />
         <span
-          className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-full bg-zinc-900 px-2 py-0.5 text-[11px] font-semibold text-white tabular"
+          className="pointer-events-none absolute top-0 -translate-x-1/2 whitespace-nowrap rounded-full bg-sage-dark px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm tabular"
           style={{ left: `${labelX}%` }}
           aria-hidden="true"
         >

@@ -71,7 +71,7 @@ export function ReportView({ profile, logs, displayName, age }: { profile: Cycle
             <button type="button" onClick={downloadReport} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-sage px-3 py-2 text-sm font-medium text-white"><Download className="h-4 w-4" />Download report</button>
           </div>
         </div>
-        <pre className="mt-4 max-h-[65vh] overflow-auto whitespace-pre-wrap break-words rounded-md bg-[#fbf7f5] p-4 font-sans text-sm leading-relaxed text-zinc-700">{report}</pre>
+        <pre className="mt-4 max-h-[65vh] overflow-auto whitespace-pre-wrap break-words rounded-md bg-zinc-50 p-4 font-sans text-sm leading-relaxed text-zinc-700">{report}</pre>
       </section>
     </div>
   );

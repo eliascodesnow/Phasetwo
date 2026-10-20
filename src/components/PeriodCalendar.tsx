@@ -81,7 +81,7 @@ function MonthGrid({
     <div>
       <h3 className="mb-3 font-display text-sm font-semibold text-zinc-800">{MONTH_FORMATTER.format(month)}</h3>
       <div className="grid grid-cols-7 gap-1 text-center">
-        {WEEKDAYS.map((weekday, index) => <span key={`${weekday}-${index}`} className="py-1 text-[10px] font-semibold uppercase text-zinc-500">{weekday}</span>)}
+        {WEEKDAYS.map((weekday, index) => <span key={`${weekday}-${index}`} className="min-w-0 py-1 text-[10px] font-semibold uppercase text-zinc-500"><span aria-hidden="true" className="sm:hidden">{weekday.slice(0, 3)}</span><span className="sr-only sm:not-sr-only">{weekday}</span></span>)}
         {monthCells(month).map((date, index) => {
           if (!date) return <span key={`empty-${index}`} className="aspect-square" />;
           const key = dateKey(date);
@@ -118,7 +118,7 @@ function MonthGrid({
               }}
               aria-label={`${MONTH_FORMATTER.format(month)} ${date.getDate()}${period ? ", recorded period" : estimated ? ", estimated period" : ""}${pain ? `, pain ${log?.pain_score} out of 10` : ""}`}
               aria-pressed={selected}
-              className={`relative flex aspect-square min-h-10 items-center justify-center rounded-full text-sm transition-colors sm:min-h-11 ${dayTone} ${selected ? "ring-2 ring-offset-2 ring-sage" : key === today ? "ring-1 ring-sage" : ""}`}
+              className={`relative flex aspect-square min-h-10 min-w-0 items-center justify-center rounded-full text-sm transition-colors sm:min-h-11 ${dayTone} ${selected ? "ring-2 ring-offset-2 ring-sage" : key === today ? "ring-1 ring-sage" : ""}`}
             >
               {date.getDate()}
               {pain && <span className={`absolute bottom-1 rounded-full ${period ? "bg-white" : "bg-sage-dark"}`} style={{ width: `${4 + (log?.pain_score ?? 0) * 0.6}px`, height: `${4 + (log?.pain_score ?? 0) * 0.6}px` }} />}

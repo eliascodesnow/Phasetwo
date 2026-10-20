@@ -125,6 +125,62 @@ html[data-theme="dark"] .border-white {
   border-color: var(--zinc-200);
 }
 
+/*
+ * The zinc scale inverts in dark mode, so "ink" fills (bg-slate, bg-zinc-900) become near-white while
+ * their text stays white: bright, unreadable buttons. In dark mode they use the accent instead.
+ */
+html[data-theme="dark"] .bg-slate,
+html[data-theme="dark"] .bg-zinc-900 {
+  background-color: var(--accent-deep);
+  color: #fff;
+}
+
+html[data-theme="dark"] .bg-slate:hover,
+html[data-theme="dark"] .bg-slate.hover\:bg-zinc-800:hover {
+  background-color: var(--accent-button);
+}
+
+/* Error and warning tints are light boxes with dark text; give them dark equivalents in dark mode. */
+html[data-theme="dark"] .bg-rose-50,
+html[data-theme="dark"] .hover\:bg-rose-50:hover {
+  background-color: #3a2029;
+}
+
+html[data-theme="dark"] .border-rose-200,
+html[data-theme="dark"] .border-rose-300 {
+  border-color: #6b3345;
+}
+
+html[data-theme="dark"] .text-rose-600,
+html[data-theme="dark"] .text-rose-700,
+html[data-theme="dark"] .text-rose-800,
+html[data-theme="dark"] .text-red-700 {
+  color: #f7a8ba;
+}
+
+/* Scrims use the inverted zinc scale too, which washes the page out in dark mode. */
+html[data-theme="dark"] .bg-zinc-900\/20,
+html[data-theme="dark"] .bg-zinc-950\/20 {
+  background-color: rgb(0 0 0 / 0.35);
+}
+
+html[data-theme="dark"] .bg-zinc-900\/35,
+html[data-theme="dark"] .bg-zinc-900\/40 {
+  background-color: rgb(0 0 0 / 0.5);
+}
+
+html[data-theme="dark"] .bg-zinc-950\/70 {
+  background-color: rgb(0 0 0 / 0.7);
+}
+
+/* App tour spotlight: glides between targets. Reduced-motion users get the global 0ms override. */
+.tour-ring,
+.tour-card {
+  transition-property: left, top, width, height, opacity;
+  transition-duration: 240ms;
+  transition-timing-function: ease;
+}
+
 .bg-sage {
   background-color: var(--accent-button);
 }
@@ -136,6 +192,54 @@ html[data-theme="dark"] .border-white {
 .text-sage,
 .text-sage-dark {
   color: var(--accent-readable);
+}
+
+/*
+ * The remaining "sage" utilities were left as the original green, which clashes with the pink accent and
+ * is a bright pale box in dark mode. Point them at the same accent tokens as the rules above.
+ */
+.bg-sage-light,
+.hover\:bg-sage-light:hover {
+  background-color: var(--accent-soft);
+}
+
+.bg-sage-light\/50,
+.bg-sage-light\/60 {
+  background-color: color-mix(in srgb, var(--accent-soft) 60%, transparent);
+}
+
+.hover\:bg-sage-dark:hover,
+.hover\:bg-sage-darker:hover {
+  background-color: var(--accent-strong);
+}
+
+.hover\:bg-sage\/10:hover {
+  background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.border-sage\/25,
+.border-sage\/30,
+.border-sage\/40 {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.hover\:border-sage:hover,
+.focus\:border-sage:focus,
+.focus\:border-sage-dark:focus {
+  border-color: var(--accent);
+}
+
+.hover\:text-sage:hover,
+.hover\:text-sage-dark:hover {
+  color: var(--accent-readable);
+}
+
+.ring-sage {
+  --tw-ring-color: var(--accent);
+}
+
+.focus\:ring-sage\/20:focus {
+  --tw-ring-color: color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .border-sage {

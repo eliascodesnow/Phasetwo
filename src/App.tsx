@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { CalendarDays, FileText, HeartPulse, Home, ListTodo, LogOut, Leaf, LogIn, MoreHorizontal, Settings, ShieldCheck } from "lucide-react";
+import { CalendarDays, FileText, HeartPulse, Home, ListTodo, LogOut, Leaf, LogIn, Settings, ShieldCheck } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
 import { defaultCycleProfile, defaultSettings } from "./lib/storage";
@@ -33,6 +33,7 @@ const WORKSPACE_TABS: Array<{ key: WorkspaceView; label: string; icon: typeof Ho
   { key: "calendar", label: "Calendar", icon: CalendarDays },
   { key: "planner", label: "Planner", icon: ListTodo },
   { key: "history", label: "History", icon: FileText },
+  { key: "report", label: "Report", icon: HeartPulse },
   { key: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -62,8 +63,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [focusCheckin, setFocusCheckin] = useState(false);
   const [detailsName, setDetailsName] = useState("");
   const [detailsAge, setDetailsAge] = useState("");
   const [detailsError, setDetailsError] = useState("");
@@ -108,7 +107,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   function closeTour() {
     setTourOpen(false);
     setSettings((current) => current.tourCompleted ? current : { ...current, tourCompleted: true });
-    setMoreOpen(false);
     setActiveView(tourStartView.current);
     window.scrollTo({ top: 0 });
   }
@@ -122,16 +120,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     document.addEventListener("visibilitychange", check);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", check); };
   }, [appReady, settings.periodReminders, reminderProfile]);
-
-  useEffect(() => {
-    if (!focusCheckin || activeView !== "today") return;
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById("symptom-check-in")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      document.getElementById("symptom-check-in")?.focus({ preventScroll: true });
-      setFocusCheckin(false);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [activeView, focusCheckin]);
 
   useEffect(() => {
     let ignore = false;
@@ -326,7 +314,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
   return (
     <div className="min-h-screen bg-base">
-      {!(activeView === "login" && !isAuthenticated && supabase) && <header className="border-b border-zinc-200 bg-white/80 backdrop-saturate-150 sticky top-0 z-30">
+      {!(activeView === "login" && !isAuthenticated && supabase) && <header className="border-b border-zinc-200 bg-white/90 backdrop-blur backdrop-saturate-150 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-8">
           <div className="flex items-center gap-2 py-1">
             <Leaf className="w-4.5 h-4.5 text-sage" strokeWidth={1.75} />
@@ -334,10 +322,10 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
               PhaseTwo
             </span>
           </div>
-          {activeView !== "login" && <nav aria-label="Main navigation" className="order-3 flex w-full items-center gap-1 overflow-x-auto sm:order-2 sm:w-auto">
+          {activeView !== "login" && <nav aria-label="Main navigation" data-tour="nav" className="order-3 grid w-full grid-cols-6 gap-0.5 sm:order-2 sm:flex sm:w-auto sm:items-center sm:gap-1">
             {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
-              <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "today") setEditingLogDate(undefined); setActiveView(key); }} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
-                <Icon className="h-4 w-4" strokeWidth={1.8} />{label}
+              <button key={key} type="button" data-tour={`tab-${key}`} aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "today") setEditingLogDate(undefined); setActiveView(key); window.scrollTo({ top: 0 }); }} className={`inline-flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md px-0.5 text-[10px] font-medium leading-tight transition-colors min-[380px]:text-[11px] sm:min-h-10 sm:shrink-0 sm:flex-row sm:gap-2 sm:px-3 sm:text-sm ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
+                <Icon className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" strokeWidth={1.8} /><span className="max-w-full truncate">{label}</span>
               </button>
             ))}
           </nav>}
@@ -390,7 +378,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         {activeView === "today" && <>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><p className="text-sm font-medium text-sage-dark">{new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date())}</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Today</h1>{settings.displayName && <p className="mt-1 text-sm text-zinc-600">Hello, {settings.displayName}</p>}</div>
-            {settings.role === "self" && <button type="button" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-sage/40 px-4 text-sm font-semibold text-sage-dark transition-colors hover:bg-sage-light"><HeartPulse className="h-4 w-4" />Period started</button>}
+            {settings.role === "self" && <button type="button" data-tour="record-period" onClick={() => setProfile((current) => recordPeriodStart(current, new Date().toISOString().slice(0, 10)))} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-sage/40 px-4 text-sm font-semibold text-sage-dark transition-colors hover:bg-sage-light"><HeartPulse className="h-4 w-4" />Period started</button>}
           </div>
           <CycleHeader profile={displayedProfile} />
           {settings.role === "self" && isAuthenticated && <WeeklyStreakCard weeks={weeklyLoginStreak} />}
@@ -420,20 +408,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         {syncError && <span role="status" className="ml-2 text-red-700">Sync issue: {syncError}</span>}
       </footer>
 
-      {activeView !== "login" && <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 backdrop-blur sm:hidden">
-        <ul className="pb-safe mx-auto grid max-w-md grid-cols-4">
-          {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
-            <li key={key}>
-              <button type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "today") setEditingLogDate(undefined); setActiveView(key); window.scrollTo({ top: 0 }); }} className={`flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${activeView === key ? "text-sage-dark" : "text-zinc-500"}`}>
-                <span className={`flex h-7 w-12 items-center justify-center rounded-full transition-colors ${activeView === key ? "bg-sage-light" : ""}`}><Icon className="h-5 w-5" strokeWidth={1.8} /></span>
-                {label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </nav>}
-
-      {tourOpen && <AppTour role={settings.role} onNavigate={(view) => { setMoreOpen(false); setActiveView(view); window.scrollTo({ top: 0 }); }} onClose={closeTour} />}
+      {tourOpen && <AppTour role={settings.role} onNavigate={(view) => { setActiveView(view); window.scrollTo({ top: 0 }); }} onClose={closeTour} />}
 
       {settings.role === "self" && <AskBellaLauncher isAuthenticated={isAuthenticated} onSignIn={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} />}
       {showLdr && <PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} />}
@@ -470,25 +445,6 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
             </div>
           </form>
         </section>
-      </div>}
-
-      {activeView !== "login" && <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-base px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-        <div className={`mx-auto grid max-w-lg grid-cols-4`}>
-          {[
-            { key: "today" as const, label: "Today", icon: Home },
-            { key: "calendar" as const, label: "Calendar", icon: CalendarDays },
-            { key: "log" as const, label: "Log", icon: HeartPulse },
-            { key: "planner" as const, label: "Planner", icon: ListTodo },
-          ].map(({ key, label, icon: Icon }) => (
-            <button key={key} type="button" aria-current={activeView === key ? "page" : undefined} onClick={() => { setMoreOpen(false); if (key === "log") { setEditingLogDate(undefined); setFocusCheckin(true); setActiveView("today"); } else setActiveView(key); }} className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium ${activeView === key || (key === "log" && focusCheckin) ? "text-sage-dark" : "text-zinc-500"}`}>
-              <Icon className="h-5 w-5" strokeWidth={1.8} />{label}
-            </button>
-          ))}
-          <button type="button" aria-expanded={moreOpen} aria-haspopup="menu" onClick={() => setMoreOpen((value) => !value)} className={`flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium ${moreOpen || ["history", "report", "settings"].includes(activeView) ? "text-sage-dark" : "text-zinc-500"}`}><MoreHorizontal className="h-5 w-5" />More</button>
-        </div>
-      </nav>}
-      {moreOpen && <div role="menu" aria-label="More destinations" className="fixed bottom-[4.5rem] right-3 z-50 w-52 rounded-lg border border-zinc-200 bg-white p-2 shadow-xl lg:hidden">
-        {[{ key: "history" as const, label: "History", icon: FileText }, { key: "report" as const, label: "Health report", icon: HeartPulse }, { key: "settings" as const, label: "Settings", icon: Settings }].map(({ key, label, icon: Icon }) => <button key={key} role="menuitem" type="button" onClick={() => { setActiveView(key); setMoreOpen(false); }} className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-zinc-700 hover:bg-zinc-100"><Icon className="h-4 w-4" />{label}</button>)}
       </div>}
     </div>
   );
