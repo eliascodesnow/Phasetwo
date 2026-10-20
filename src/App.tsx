@@ -5,6 +5,7 @@ import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
 import { defaultCycleProfile, defaultSettings } from "./lib/storage";
 import { CycleHeader } from "./components/CycleHeader";
 import { GoogleLogo } from "./components/GoogleLogo";
+import { AppTour } from "./components/AppTour";
 import { TaskPlanner } from "./components/TaskPlanner";
 import { LDRModule } from "./components/LDRModule";
 import { SymptomLogger, type SymptomLoggerSaveRef } from "./components/SymptomLogger";
@@ -66,6 +67,9 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [detailsName, setDetailsName] = useState("");
   const [detailsAge, setDetailsAge] = useState("");
   const [detailsError, setDetailsError] = useState("");
+  const [tourOpen, setTourOpen] = useState(false);
+  const tourStartView = useRef<WorkspaceView>("today");
+  const tourAutoHandled = useRef(false);
   const deletingAccount = useRef(false);
   const symptomSaveAction = useRef<SymptomLoggerSaveRef["current"]>(null);
 
@@ -83,6 +87,31 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       return () => media.removeEventListener("change", applyTheme);
     }
   }, [settings.themeMode]);
+
+  // Open the tour once for anyone who has not seen it: signed-in users right away, guests after
+  // the optional details prompt is out of the way.
+  useEffect(() => {
+    if (!appReady || tourAutoHandled.current || activeView === "login") return;
+    if (settings.tourCompleted) { tourAutoHandled.current = true; return; }
+    if (isAuthenticated || settings.personalDetailsPromptSeen) {
+      tourAutoHandled.current = true;
+      tourStartView.current = "today";
+      setTourOpen(true);
+    }
+  }, [appReady, activeView, isAuthenticated, settings.tourCompleted, settings.personalDetailsPromptSeen]);
+
+  function startTour() {
+    tourStartView.current = activeView;
+    setTourOpen(true);
+  }
+
+  function closeTour() {
+    setTourOpen(false);
+    setSettings((current) => current.tourCompleted ? current : { ...current, tourCompleted: true });
+    setMoreOpen(false);
+    setActiveView(tourStartView.current);
+    window.scrollTo({ top: 0 });
+  }
 
   const reminderProfile = settings.role === "partner" && sharedCycleProfile ? sharedCycleProfile : profile;
   useEffect(() => {
@@ -382,7 +411,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
         {activeView === "history" && <HistoryView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setActiveView("today"); }} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
         {activeView === "report" && <ReportView profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} displayName={settings.displayName} age={settings.age} />}
-        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} />}
+        {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt}  onStartTour={startTour}/>}
 
       </main>
 
@@ -403,6 +432,8 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           ))}
         </ul>
       </nav>}
+
+      {tourOpen && <AppTour role={settings.role} onNavigate={(view) => { setMoreOpen(false); setActiveView(view); window.scrollTo({ top: 0 }); }} onClose={closeTour} />}
 
       {settings.role === "self" && <AskBellaLauncher />}
       {showLdr && <PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} />}

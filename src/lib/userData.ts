@@ -34,6 +34,7 @@ export async function loadSyncedAppState(userId: string): Promise<UserAppState> 
         : undefined,
       personalDetailsPromptSeen: Boolean(data.app_settings?.personalDetailsPromptSeen),
       periodReminders: Boolean(data.app_settings?.periodReminders),
+      tourCompleted: Boolean(data.app_settings?.tourCompleted),
     },
     chatMessages: data.chat_messages ?? [],
   };

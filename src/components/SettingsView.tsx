@@ -21,6 +21,7 @@ export function SettingsView({
   onSave,
   saving,
   savedAt,
+  onStartTour,
 }: {
   settings: AppSettings;
   onSettingsChange: (settings: AppSettings) => void;
@@ -34,6 +35,7 @@ export function SettingsView({
   onSave: () => Promise<void>;
   saving: boolean;
   savedAt: Date | null;
+  onStartTour: () => void;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -89,6 +91,16 @@ export function SettingsView({
               </button>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="border-b border-zinc-200 pb-5" aria-labelledby="tour-heading">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="max-w-md">
+            <h2 id="tour-heading" className="font-display text-base font-semibold text-zinc-900">App tour</h2>
+            <p className="mt-1 text-sm text-zinc-500">A quick walkthrough of every feature and how to log your period.</p>
+          </div>
+          <button type="button" onClick={onStartTour} className="min-h-10 rounded-md border border-zinc-200 px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50">Take the tour</button>
         </div>
       </section>
 
