@@ -4,7 +4,7 @@
 
 :root {
   color-scheme: dark;
-  --color-base: #171218;
+  --color-base: #000000;
   --tour-wash: linear-gradient(165deg, rgb(166 77 104 / 0.22) 0%, rgb(8 4 8 / 0.55) 100%);
   --color-surface: #211a23;
   --color-ink: #f6eff4;
@@ -127,6 +127,15 @@ html[data-theme="dark"] .bg-white,
 html[data-theme="dark"] .bg-white\/80,
 html[data-theme="dark"] .bg-white\/90 {
   background-color: var(--color-surface);
+}
+
+/* The sticky top bar is translucent white in light mode; in dark mode it is pure black like the page, so the top of the screen is not a bright strip. */
+html[data-theme="dark"] .bg-white\/95 {
+  background-color: rgb(0 0 0 / 0.92);
+}
+
+html {
+  background-color: var(--color-base);
 }
 
 html[data-theme="dark"] .border-white {

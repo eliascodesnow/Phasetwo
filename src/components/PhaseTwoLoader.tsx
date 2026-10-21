@@ -13,13 +13,19 @@ type Props = {
   /** Accessible name announced to screen readers. */
   label?: string;
   className?: string;
+  /** Hide the "PLAN YOUR CYCLE ADEQUATELY" line (for small placements such as the top bar). */
+  showLabel?: boolean;
+  /** Overrides the size of the drawing, e.g. "h-8 w-8". */
+  markClassName?: string;
+  /** Purely decorative: hidden from screen readers (use when a text name sits next to it). */
+  decorative?: boolean;
 };
 
 /**
  * PhaseTwo's default loading animation: the leaf travels into a smiling face and traces its path back, in a loop.
  * Everything is drawn in SVG and driven by one requestAnimationFrame loop, so it works offline and needs no assets.
  */
-export function PhaseTwoLoader({ variant = "page", label = "Loading PhaseTwo", className = "" }: Props) {
+export function PhaseTwoLoader({ variant = "page", label = "Loading PhaseTwo", className = "", showLabel = true, markClassName, decorative = false }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const bodyRef = useRef<SVGPathElement>(null);
   const stalkRef = useRef<SVGPathElement>(null);
@@ -90,15 +96,15 @@ export function PhaseTwoLoader({ variant = "page", label = "Loading PhaseTwo", c
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const size = variant === "page" ? "w-[min(56vmin,280px)]" : variant === "inline" ? "w-36" : "mx-auto w-36 sm:w-44";
+  const size = markClassName ?? (variant === "page" ? "w-[min(56vmin,280px)]" : variant === "inline" ? "w-36" : "mx-auto w-36 sm:w-44");
   const text = variant === "page" ? "text-[11px] sm:text-xs" : "text-[9px]";
   const layout = variant === "page"
     ? "flex min-h-screen flex-col items-center justify-center gap-4 bg-base px-4"
     : variant === "inline" ? "flex flex-col items-center justify-center gap-3 py-10" : "";
 
   return (
-    <div role="status" aria-label={label} className={`${layout} ${className}`.trim()} style={{ color: "var(--accent-readable, #645d45)" }}>
-      <svg ref={svgRef} viewBox="0 0 1240 1240" aria-hidden="true" className={`${size} h-auto overflow-visible`}>
+    <div {...(decorative ? { "aria-hidden": true } : { role: "status", "aria-label": label })} className={`${layout} ${className}`.trim()} style={{ color: "var(--accent-readable, #645d45)" }}>
+      <svg ref={svgRef} viewBox="0 0 1240 1240" aria-hidden="true" className={`${size} ${markClassName ? "" : "h-auto"} overflow-visible`}>
         <g ref={allRef}>
           <circle ref={rippleRef} cx={CX} cy={CY} r={R} fill="none" stroke="currentColor" strokeWidth={14} opacity={0} />
           <g ref={rotRef} fill="none" stroke="currentColor" strokeWidth={70} strokeLinecap="round" strokeLinejoin="round">
@@ -108,11 +114,11 @@ export function PhaseTwoLoader({ variant = "page", label = "Loading PhaseTwo", c
           {EYE_X.map((_, i) => <circle key={i} ref={(el) => { eyeRefs.current[i] = el; }} r={34} fill="currentColor" />)}
         </g>
       </svg>
-      <div aria-hidden="true" className={`${text} text-center font-semibold`} style={{ letterSpacing: "0.32em", paddingLeft: "0.32em" }}>
+      {showLabel && <div aria-hidden="true" className={`${text} text-center font-semibold`} style={{ letterSpacing: "0.32em", paddingLeft: "0.32em" }}>
         {[...TAGLINE].map((ch, i) => (
           <span key={i} ref={(el) => { letterRefs.current[i] = el; }} className="inline-block whitespace-pre" style={{ opacity: 0 }}>{ch}</span>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
