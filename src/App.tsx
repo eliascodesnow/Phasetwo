@@ -21,6 +21,7 @@ import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
 const AppTour = lazy(() => import("./components/AppTour").then((module) => ({ default: module.AppTour })));
 import { GoogleG } from "./components/GoogleG";
 import { PeriodQuickLog } from "./components/PeriodQuickLog";
+import { PhaseTwoLoader } from "./components/PhaseTwoLoader";
 
 // Screens and floating helpers load when first needed, so the first visit downloads far less on mobile data.
 function lazyNamed<M extends Record<string, unknown>, K extends keyof M>(load: () => Promise<M>, key: K): LazyExoticComponent<M[K] extends ComponentType<any> ? M[K] : never> {
@@ -359,7 +360,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const displayedProfile = showLdr && sharedCycleProfile ? sharedCycleProfile : profile;
 
   if (!appReady) {
-    return <div role="status" className="flex min-h-screen flex-col items-center justify-center gap-3 text-sm text-zinc-500"><Leaf className="h-6 w-6 animate-pulse text-sage" strokeWidth={1.5} />Loading your workspace…</div>;
+    return <PhaseTwoLoader label="Loading your workspace" />;
   }
 
   return (
@@ -395,7 +396,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       {activeView === "login" && !isAuthenticated && supabase && <div className="flex min-h-14 items-center justify-between border-b border-zinc-200 px-4"><span className="font-display font-bold text-zinc-900">PhaseTwo</span><button type="button" onClick={() => setActiveView("today")} className="inline-flex min-h-11 items-center gap-2 text-sm text-zinc-600"><LogIn className="h-4 w-4 rotate-180" />Back</button></div>}
 
       <main className="max-w-6xl mx-auto space-y-7 px-4 py-6 pb-10 sm:px-8 sm:py-8">
-        <Suspense fallback={<p role="status" className="py-10 text-center text-sm text-zinc-500">Loading…</p>}>
+        <Suspense fallback={<PhaseTwoLoader variant="inline" label="Loading" />}>
         {!isAuthenticated && supabase && activeView === "login" && <section className="mx-auto mt-6 max-w-sm">
           <h1 className="font-display text-3xl font-bold text-zinc-900">Sign in</h1>
           <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="mt-8 inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-full border border-zinc-300 bg-white px-4 text-[15px] font-semibold text-zinc-800 transition-[background-color,transform] hover:bg-zinc-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60">

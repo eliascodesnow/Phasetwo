@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { PhaseTwoLoader } from "./PhaseTwoLoader";
 import { CalendarDays, CircleDot, Droplets, Pencil, Trash2 } from "lucide-react";
 import type { CycleProfile } from "../types";
 import { BLEEDING_LABELS, IMPACT_LABELS, PAIN_LOCATION_LABELS, SYMPTOM_LABELS, type SymptomLog } from "../lib/symptoms";
@@ -60,7 +61,7 @@ export function HistoryView({ displayName, age, profile, logs, onProfileChange, 
           ) : <p className="mt-4 text-sm text-zinc-500">Pain and symptom entries appear here when you save a daily check-in.</p>}
         </section>
       </div>
-      <Suspense fallback={<p role="status" className="text-sm text-zinc-500">Loading your report…</p>}>
+      <Suspense fallback={<PhaseTwoLoader variant="inline" label="Loading your report" />}>
         <ReportView profile={profile} logs={logs} displayName={displayName} age={age} />
       </Suspense>
       <SaveChangesButton onSave={onSave} saving={saving} savedAt={savedAt} />
