@@ -12,6 +12,7 @@ import { clearLocalUserData, LOCAL_GUEST_ID, loadLocalAppState, saveLocalAppStat
 import { loadSyncedAppState, saveSyncedAppState } from "./lib/userData";
 import { recordPeriodStart } from "./lib/cycleUtils";
 import { useScrollLock } from "./lib/scrollLock";
+import { useSwipeNavigation } from "./lib/swipeNav";
 import { pendingPartnerCode } from "./lib/partnerInvite";
 import { sendDueReminder } from "./lib/notifications";
 import type { SymptomLog } from "./lib/symptoms";
@@ -47,6 +48,7 @@ const WORKSPACE_TABS: Array<{ key: WorkspaceView; label: string; icon: typeof Ho
   { key: "history", label: "History", icon: FileText },
   { key: "settings", label: "Settings", icon: Settings },
 ];
+const WORKSPACE_TAB_KEYS = WORKSPACE_TABS.map((tab) => tab.key);
 
 function LegalAcceptanceSync({ userId }: { userId: string | null }) {
   useEffect(() => {
@@ -358,6 +360,23 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     setSettings((current) => ({ ...current, role: "partner", ldrEnabled: true }));
   }
 
+  const goToTab = (key: WorkspaceView) => {
+    if (key === "today") setEditingLogDate(undefined);
+    setActiveView(key);
+  };
+
+  useSwipeNavigation({
+    enabled: appReady && !tourOpen && activeView !== "login" && activeView !== "report",
+    order: WORKSPACE_TAB_KEYS,
+    current: activeView,
+    onNavigate: (key) => { goToTab(key); window.scrollTo({ top: 0 }); },
+  });
+
+  // The nav scrolls sideways on small screens, so keep the current tab visible after a swipe.
+  useEffect(() => {
+    document.querySelector<HTMLElement>("[data-tour='nav'] [aria-current='page']")?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [activeView]);
+
   const showLdr = settings.role === "partner" && settings.ldrEnabled;
   const displayedProfile = showLdr && sharedCycleProfile ? sharedCycleProfile : profile;
 
@@ -377,7 +396,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
           </div>
           {activeView !== "login" && <nav aria-label="Main navigation" data-tour="nav" className="order-3 flex w-full items-center gap-1 overflow-x-auto sm:order-2 sm:w-auto">
             {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
-              <button key={key} type="button" data-tour={`tab-${key}`} aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "today") setEditingLogDate(undefined); setActiveView(key); }} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
+              <button key={key} type="button" data-tour={`tab-${key}`} aria-current={activeView === key ? "page" : undefined} onClick={() => goToTab(key)} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
                 <Icon className="h-4 w-4" strokeWidth={1.8} />{label}
               </button>
             ))}
