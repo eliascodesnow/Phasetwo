@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Leaf } from "lucide-react";
+import { PhaseTwoLoader } from "./PhaseTwoLoader";
 import { accountAcceptance, isCurrentAcceptance, requestPersistentStorage, PRIVACY_URL, readStoredAcceptance, storeAcceptance, TERMS_URL } from "../lib/legal";
 
 const COLLECTS = [
@@ -53,9 +53,9 @@ export function LegalConsentGate({ children }: { children: ReactNode }) {
   return (
     <main className="flex min-h-screen items-start justify-center bg-base px-4 py-6 pb-safe sm:items-center sm:py-10">
       <section aria-labelledby="legal-gate-title" className="w-full max-w-xl rounded-2xl border border-zinc-200 bg-white p-5 shadow-card sm:p-8">
-        <div className="flex items-center gap-2 text-sage-dark">
-          <Leaf className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" />
-          <span className="font-display text-lg font-bold text-zinc-900">PhaseTwo</span>
+        <div className="flex flex-col items-center">
+          <PhaseTwoLoader variant="mark" label="PhaseTwo" />
+          <span className="mt-1 font-display text-lg font-bold text-zinc-900">PhaseTwo</span>
         </div>
 
         <h1 id="legal-gate-title" className="mt-5 font-display text-2xl font-bold text-zinc-900">
