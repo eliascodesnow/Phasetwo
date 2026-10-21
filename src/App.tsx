@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType, type LazyExoticComponent, useEffect, useRef, useState, type FormEvent } from "react";
+import { Suspense, type ComponentType, type LazyExoticComponent, useEffect, useRef, useState, type FormEvent } from "react";
 import { CalendarDays, FileText, HeartPulse, Home, ListTodo, LogOut, Leaf, LogIn, Settings, ShieldCheck } from "lucide-react";
 import type { AppSettings, ChatMessage, CycleProfile, Task } from "./types";
 import { defaultCycleProfile, defaultSettings } from "./lib/storage";
@@ -12,19 +12,21 @@ import { clearLocalUserData, LOCAL_GUEST_ID, loadLocalAppState, saveLocalAppStat
 import { loadSyncedAppState, saveSyncedAppState } from "./lib/userData";
 import { recordPeriodStart } from "./lib/cycleUtils";
 import { useScrollLock } from "./lib/scrollLock";
+import { lazyWithReload } from "./lib/lazyLoad";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { pendingPartnerCode } from "./lib/partnerInvite";
 import { sendDueReminder } from "./lib/notifications";
 import type { SymptomLog } from "./lib/symptoms";
 import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
-
-// Loaded on demand: the tour is shown once per person, so it should not weigh down the main bundle.
-const AppTour = lazy(() => import("./components/AppTour").then((module) => ({ default: module.AppTour })));
 import { GoogleG } from "./components/GoogleG";
 import { PeriodQuickLog } from "./components/PeriodQuickLog";
 
+// Loaded on demand: the tour is shown once per person, so it should not weigh down the main bundle.
+const AppTour = lazyWithReload(() => import("./components/AppTour").then((module) => ({ default: module.AppTour })));
+
 // Screens and floating helpers load when first needed, so the first visit downloads far less on mobile data.
 function lazyNamed<M extends Record<string, unknown>, K extends keyof M>(load: () => Promise<M>, key: K): LazyExoticComponent<M[K] extends ComponentType<any> ? M[K] : never> {
-  return lazy(() => load().then((module) => ({ default: module[key] as never })));
+  return lazyWithReload(() => load().then((module) => ({ default: module[key] as never }))) as never;
 }
 const TaskPlanner = lazyNamed(() => import("./components/TaskPlanner"), "TaskPlanner");
 const LDRModule = lazyNamed(() => import("./components/LDRModule"), "LDRModule");
@@ -34,7 +36,7 @@ const HistoryView = lazyNamed(() => import("./components/HistoryView"), "History
 const SettingsView = lazyNamed(() => import("./components/SettingsView"), "SettingsView");
 const PartnerAdviceLauncher = lazyNamed(() => import("./components/PartnerAdviceLauncher"), "PartnerAdviceLauncher");
 const AskBellaLauncher = lazyNamed(() => import("./components/AskBellaLauncher"), "AskBellaLauncher");
-const Analytics = lazy(() => import("@vercel/analytics/react").then((module) => ({ default: module.Analytics })));
+const Analytics = lazyWithReload(() => import("@vercel/analytics/react").then((module) => ({ default: module.Analytics })));
 
 const SELF_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 type WorkspaceView = "today" | "calendar" | "planner" | "history" | "report" | "settings" | "login";
@@ -395,6 +397,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       {activeView === "login" && !isAuthenticated && supabase && <div className="flex min-h-14 items-center justify-between border-b border-zinc-200 px-4"><span className="font-display font-bold text-zinc-900">PhaseTwo</span><button type="button" onClick={() => setActiveView("today")} className="inline-flex min-h-11 items-center gap-2 text-sm text-zinc-600"><LogIn className="h-4 w-4 rotate-180" />Back</button></div>}
 
       <main className="max-w-6xl mx-auto space-y-7 px-4 py-6 pb-10 sm:px-8 sm:py-8">
+        <ErrorBoundary resetKey={activeView}>
         <Suspense fallback={<p role="status" className="py-10 text-center text-sm text-zinc-500">Loading…</p>}>
         {!isAuthenticated && supabase && activeView === "login" && <section className="mx-auto mt-6 max-w-sm">
           <h1 className="font-display text-3xl font-bold text-zinc-900">Sign in</h1>
@@ -436,6 +439,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         {activeView === "settings" && <SettingsView settings={settings} onSettingsChange={setSettings} isAuthenticated={isAuthenticated} isLinkedPartner={Boolean(sharedCycleProfile)} onLeavePartnerSync={leavePartnerSync} onPartnerLinked={refreshPartnerLink} initialPartnerCode={incomingPartnerCode} onInitialPartnerCodeUsed={() => setIncomingPartnerCode(null)} profile={profile} onProfileChange={setProfile} onDeleteAccount={deleteAccount} onSave={saveWorkspace} saving={saving} savedAt={savedAt} onStartTour={startTour} />}
 
       </Suspense>
+        </ErrorBoundary>
       </main>
 
       <footer className="max-w-6xl mx-auto px-6 sm:px-10 py-8 text-xs text-zinc-400">

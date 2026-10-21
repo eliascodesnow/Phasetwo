@@ -66,7 +66,7 @@ export const TOUR_STEPS: TourStep[] = [
       { icon: "calendar", label: "Calendar", text: "Period days and estimates. Tap a past date, then Record period start." },
       { icon: "planner", label: "Planner", text: "Tasks matched to the phase that suits them." },
       { icon: "history", label: "History", text: "Edit or delete period starts and check-ins." },
-      { icon: "report", label: "Report", text: "A summary to print or share with your doctor. On phones it is under More." },
+      { icon: "report", label: "Report", text: "A summary to print or share with your doctor. Find it at the bottom of History." },
     ],
     target: "nav",
     audience: "self",
