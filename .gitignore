@@ -12,3 +12,4 @@ dist/
 *.log
 build.exit
 tscout.txt
+supabase/.temp/

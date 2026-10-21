@@ -32,3 +32,13 @@
 - Latest production build after the personal-details feature: passed TypeScript and Vite; existing main-chunk warning remains.
 - Browser confirmed details dialog, name/age in report, immediate local persistence, and honest empty recorded-start wording.
 - No Supabase migration was applied; there is no confirmed local Supabase instance/SQL test harness and no production credentials were accessed.
+
+## Stability and UX safeguards (21 Oct 2026)
+- Status: implemented on branch `audit/ux-safety`; verified by the Vercel preview build only (no local install was possible in the review environment).
+- **Error boundary.** `src/components/ErrorBoundary.tsx` wraps the whole app (`main.tsx`) and each screen (`App.tsx`, reset when the tab changes). A screen that fails to load now shows "This screen did not load" with a Reload button instead of a blank page; the header and navigation keep working.
+- **Stale-chunk recovery.** `src/lib/lazyLoad.ts` reloads the page once when a code-split file is missing (an open tab after a new deploy). A second failure falls through to the error boundary, so there is no reload loop.
+- **Install manifest.** `public/site.webmanifest` had an empty name; it now sets name, start URL and theme colour so the installed app is labelled correctly.
+- **Tour text.** The Report row no longer says it is under "More" (there is no More menu; the report sits at the bottom of History).
+- **Dead code removed.** Stale root `index.css` and `vite-env.d.ts` (the live copies are in `src/`), unused `GoogleLogo`, `SettingsDrawer` and `shareState`, a committed `supabase/.temp` file (now ignored), and a `tsconfig` exclude list pointing at files that no longer exist.
+- **Navigation.** Single top navigation on all screen sizes (no bottom bar); Report lives inside History.
+- **Known follow-ups.** The dark theme is applied after the first paint, so a dark-mode user can see a brief light flash on load. Server push reminders (`supabase/functions/period-reminders`, migration `0010`) are in the repo but not deployed or applied; in-app reminders work without them.
