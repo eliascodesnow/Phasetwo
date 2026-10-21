@@ -104,6 +104,8 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     const applyTheme = () => {
       const theme = mode === "system" ? (media.matches ? "light" : "dark") : mode;
       document.documentElement.dataset.theme = theme;
+      // Colours the phone's status bar area to match the page (black in dark mode).
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#000000" : "#f8f4f6");
       setResolvedTheme(theme);
     };
     applyTheme();
@@ -368,7 +370,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       {!(activeView === "login" && !isAuthenticated && supabase) && <header className="border-b border-zinc-200 bg-white/95 backdrop-blur backdrop-saturate-150 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-8">
           <div className="flex items-center gap-2 py-1">
-            <Leaf className="w-4.5 h-4.5 text-sage" strokeWidth={1.75} />
+            <PhaseTwoLoader variant="mark" decorative showLabel={false} markClassName="h-8 w-8" className="shrink-0" />
             <span className="font-display text-base font-semibold tracking-tight text-zinc-900">
               PhaseTwo
             </span>
