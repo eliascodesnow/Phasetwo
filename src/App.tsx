@@ -21,6 +21,8 @@ import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
 // Loaded on demand: the tour is shown once per person, so it should not weigh down the main bundle.
 const AppTour = lazy(() => import("./components/AppTour").then((module) => ({ default: module.AppTour })));
 import { GoogleG } from "./components/GoogleG";
+import { TurnstileWidget } from "./components/TurnstileWidget";
+import { turnstileEnabled } from "./lib/turnstile";
 import { PeriodQuickLog } from "./components/PeriodQuickLog";
 import { PhaseTwoLoader } from "./components/PhaseTwoLoader";
 
@@ -86,6 +88,8 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [loginError, setLoginError] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
@@ -296,15 +300,23 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     setLoginBusy(true);
     setLoginError("");
     setLoginMessage("");
+    if (turnstileEnabled && !captchaToken) {
+      setLoginError("One moment, the security check is still running.");
+      setLoginBusy(false);
+      return;
+    }
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: window.location.origin, ...(captchaToken ? { captchaToken } : {}) },
     });
     if (error) {
       setLoginError(error.message);
     } else {
       setLoginMessage("Check your email.");
     }
+    // A Turnstile token works once, so get a new one for the next attempt.
+    setCaptchaToken(null);
+    setCaptchaResetKey((key) => key + 1);
     setLoginBusy(false);
   }
 
@@ -429,9 +441,10 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
             <label className="block text-sm font-medium text-zinc-700">Email
               <input name="email" type="email" autoComplete="email" required className="mt-1.5 min-h-12 w-full rounded-2xl border border-zinc-300 bg-white px-4 text-base text-zinc-900 outline-none transition focus:border-sage-dark focus:ring-2 focus:ring-sage/20" />
             </label>
+            <TurnstileWidget onToken={setCaptchaToken} onError={setLoginError} resetKey={captchaResetKey} />
             {loginError && <p role="alert" className="text-sm text-rose-700">{loginError}</p>}
             {loginMessage && <p role="status" className="text-sm font-medium text-sage-dark">{loginMessage}</p>}
-            <button type="submit" disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-sage-dark px-4 text-[15px] font-semibold text-white transition-[background-color,transform] hover:bg-sage-darker active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={loginBusy || (turnstileEnabled && !captchaToken)} className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-sage-dark px-4 text-[15px] font-semibold text-white transition-[background-color,transform] hover:bg-sage-darker active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60">
               Email me a link
             </button>
           </form>
