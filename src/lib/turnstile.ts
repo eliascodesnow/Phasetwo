@@ -7,6 +7,7 @@ export interface TurnstileRenderOptions {
   "expired-callback"?: () => void;
   "error-callback"?: (errorCode?: string) => boolean | void;
   "timeout-callback"?: () => void;
+  action?: string;
   theme?: "light" | "dark" | "auto";
   size?: "normal" | "flexible" | "compact";
   appearance?: "always" | "execute" | "interaction-only";
@@ -27,8 +28,9 @@ declare global {
 
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
-/** Public site key. Leave unset to run without a challenge (e.g. local dev with CAPTCHA off in Supabase). */
-export const turnstileSiteKey: string = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? "";
+/** Public Turnstile site key for the PhaseTwo widget (safe to ship in the bundle). VITE_TURNSTILE_SITE_KEY overrides it. */
+const DEFAULT_SITE_KEY = "0x4AAAAAAFg7UsuXK1UBS_kR";
+export const turnstileSiteKey: string = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() || DEFAULT_SITE_KEY;
 export const turnstileEnabled = turnstileSiteKey.length > 0;
 
 let pending: Promise<TurnstileApi> | null = null;
