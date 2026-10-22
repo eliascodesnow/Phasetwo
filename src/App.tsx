@@ -21,6 +21,7 @@ import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
 // Loaded on demand: the tour is shown once per person, so it should not weigh down the main bundle.
 const AppTour = lazy(() => import("./components/AppTour").then((module) => ({ default: module.AppTour })));
 import { GoogleG } from "./components/GoogleG";
+import { TurnstileWidget, turnstileEnabled } from "./components/TurnstileWidget";
 import { PeriodQuickLog } from "./components/PeriodQuickLog";
 import { PhaseTwoLoader } from "./components/PhaseTwoLoader";
 
@@ -86,6 +87,8 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [loginError, setLoginError] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
@@ -293,18 +296,25 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     if (!supabase) return;
     const email = (new FormData(event.currentTarget).get("email") as string | null)?.trim();
     if (!email) return;
+    if (turnstileEnabled && !captchaToken) {
+      setLoginError("Please complete the security check first.");
+      return;
+    }
     setLoginBusy(true);
     setLoginError("");
     setLoginMessage("");
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: window.location.origin, ...(captchaToken ? { captchaToken } : {}) },
     });
     if (error) {
       setLoginError(error.message);
     } else {
       setLoginMessage("Check your email.");
     }
+    // Turnstile tokens are single-use, so every attempt needs a fresh challenge.
+    setCaptchaToken(null);
+    setCaptchaResetKey((key) => key + 1);
     setLoginBusy(false);
   }
 
@@ -401,7 +411,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
               </button>
             ))}
           </nav>}
-          {!isAuthenticated && supabase && activeView === "login" ? <button type="button" onClick={() => setActiveView("today")} className="order-2 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100"><LogIn className="h-4 w-4 rotate-180" />Back to tracker</button> : !isAuthenticated && supabase ? <button type="button" onClick={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} aria-label="Sign in to your account" title="Sign in to your account" className="order-2 inline-flex items-center gap-2 rounded-full border border-sage bg-sage-light px-3 py-2 text-xs font-semibold text-sage-dark transition-colors hover:bg-sage/10 sm:order-3"><LogIn className="h-3.5 w-3.5" />Sign in</button> : isAuthenticated && <button
+          {!isAuthenticated && supabase && activeView === "login" ? <button type="button" onClick={() => setActiveView("today")} className="order-2 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100"><LogIn className="h-4 w-4 rotate-180" />Back to tracker</button> : !isAuthenticated && supabase ? <button type="button" onClick={() => { setLoginError(""); setLoginMessage(""); setCaptchaToken(null); setActiveView("login"); }} aria-label="Sign in to your account" title="Sign in to your account" className="order-2 inline-flex items-center gap-2 rounded-full border border-sage bg-sage-light px-3 py-2 text-xs font-semibold text-sage-dark transition-colors hover:bg-sage/10 sm:order-3"><LogIn className="h-3.5 w-3.5" />Sign in</button> : isAuthenticated && <button
             type="button"
             onClick={() => void signOut()}
             aria-label="Sign out"
@@ -429,9 +439,10 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
             <label className="block text-sm font-medium text-zinc-700">Email
               <input name="email" type="email" autoComplete="email" required className="mt-1.5 min-h-12 w-full rounded-2xl border border-zinc-300 bg-white px-4 text-base text-zinc-900 outline-none transition focus:border-sage-dark focus:ring-2 focus:ring-sage/20" />
             </label>
+            <TurnstileWidget onToken={setCaptchaToken} onLoadError={setLoginError} resetKey={captchaResetKey} />
             {loginError && <p role="alert" className="text-sm text-rose-700">{loginError}</p>}
             {loginMessage && <p role="status" className="text-sm font-medium text-sage-dark">{loginMessage}</p>}
-            <button type="submit" disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-sage-dark px-4 text-[15px] font-semibold text-white transition-[background-color,transform] hover:bg-sage-darker active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={loginBusy || (turnstileEnabled && !captchaToken)} className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-sage-dark px-4 text-[15px] font-semibold text-white transition-[background-color,transform] hover:bg-sage-darker active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60">
               Email me a link
             </button>
           </form>

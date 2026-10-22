@@ -79,6 +79,15 @@ cross-device sync, and partner invitations:
 
 4. Copy `.env.local.example` to `.env.local` and set `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_PUBLISHABLE_KEY` from your Supabase project API settings.
+   Optional bot protection for email sign-in links: create a Cloudflare Turnstile
+   widget for your domain, set its public site key as `VITE_TURNSTILE_SITE_KEY`
+   (also in your Vercel environment variables), then in Supabase open
+   **Authentication > Attack Protection**, enable CAPTCHA, choose Cloudflare
+   Turnstile, and paste the widget's secret key there. The secret key never goes
+   in the frontend. Enable both sides together: with Supabase CAPTCHA on and no
+   site key, email sign-in is rejected; with a site key but Supabase CAPTCHA off,
+   the check is shown but not enforced. Leave the site key empty to hide the
+   check locally.
 5. Deploy the `bella-chat` and `partner-invites` Supabase Edge Functions.
 6. Restart the dev server. Use **Sign in** in the app when you want to open your
   account workspace; signing in is not required for local tracking.
