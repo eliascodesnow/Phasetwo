@@ -8,9 +8,11 @@ interface TurnstileWidgetProps {
   onError?: (message: string) => void;
   /** Change this value to discard the current token and run the check again (tokens are single-use). */
   resetKey?: number;
+  /** Label for this surface (1-32 letters, digits, _ or -), reported back by Cloudflare. */
+  action?: string;
 }
 
-export function TurnstileWidget({ onToken, onError, resetKey = 0 }: TurnstileWidgetProps) {
+export function TurnstileWidget({ onToken, onError, resetKey = 0, action = "signin" }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | undefined>(undefined);
   // Keep the latest callbacks without re-rendering the widget when the parent re-renders.
@@ -27,6 +29,7 @@ export function TurnstileWidget({ onToken, onError, resetKey = 0 }: TurnstileWid
         if (cancelled) return;
         widgetId.current = turnstile.render(container, {
           sitekey: turnstileSiteKey,
+          action,
           theme: "light",
           size: "flexible",
           // Stays invisible for most people; only shows up if Cloudflare needs an interaction.
@@ -54,6 +57,7 @@ export function TurnstileWidget({ onToken, onError, resetKey = 0 }: TurnstileWid
         widgetId.current = undefined;
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- render once per mount; the action is fixed for a surface
   }, []);
 
   // Skip the first run: the widget is already fresh when it mounts.
