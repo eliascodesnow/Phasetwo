@@ -17,6 +17,7 @@ import { pendingPartnerCode } from "./lib/partnerInvite";
 import { sendDueReminder } from "./lib/notifications";
 import type { SymptomLog } from "./lib/symptoms";
 import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
+import { InAppNoticeCard } from "./components/InAppNoticeCard";
 
 // Loaded on demand: the tour is shown once per person, so it should not weigh down the main bundle.
 const AppTour = lazy(() => import("./components/AppTour").then((module) => ({ default: module.AppTour })));
@@ -455,6 +456,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
             <div><p className="text-sm font-medium text-sage-dark">{new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date())}</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Today</h1>{settings.displayName && <p className="mt-1 text-sm text-zinc-600">Hello, {settings.displayName}</p>}</div>
                       </div>
           <CycleHeader profile={displayedProfile} />
+          {settings.inAppTips !== false && <InAppNoticeCard profile={displayedProfile} role={settings.role} userId={userId} logs={settings.role === "self" ? symptomLogs : undefined} />}
           {settings.role === "self" && isAuthenticated && <WeeklyStreakCard weeks={weeklyLoginStreak} />}
           {settings.role === "self" && <PeriodQuickLog profile={profile} onChange={setProfile} />}
           <PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setFocusCheckin(true); }} />

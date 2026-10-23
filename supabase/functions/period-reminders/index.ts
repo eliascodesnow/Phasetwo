@@ -1,42 +1,12 @@
-// Sends a push notification 2 days and 1 day before each user's predicted period.
+// Sends the daily push notifications: period reminders (2 days and 1 day before) and, for people who
+// turned on "Cycle tips", a PMS heads-up (5 days before) and a "period may start today" nudge.
+// What is sent and when is decided in _shared/pushContent.ts.
 // Run once a day (see docs/PUSH_REMINDERS.md). Requires the secrets listed there.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import webpush from "npm:web-push@3.6.7";
+import { selectPush, todayIn, type PushProfile } from "../_shared/pushContent.ts";
 
-const DAYS_BEFORE = [2, 1];
-const MS_PER_DAY = 86_400_000;
-
-type Profile = { lastPeriodStart?: string; periodStartDates?: string[]; cycleLength?: number; timezone?: string };
-type Settings = { role?: string; periodReminders?: boolean };
-
-function todayIn(timezone: string): string {
-  try {
-    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
-    const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-    return `${get("year")}-${get("month")}-${get("day")}`;
-  } catch {
-    return new Date().toISOString().slice(0, 10);
-  }
-}
-
-function dayDiff(from: string, to: string): number {
-  return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / MS_PER_DAY);
-}
-
-function addDays(key: string, days: number): string {
-  return new Date(Date.parse(`${key}T12:00:00Z`) + days * MS_PER_DAY).toISOString().slice(0, 10);
-}
-
-/** Mirrors the app: cycle day wraps at the cycle length; next start is the day after the cycle ends. */
-function nextPeriod(profile: Profile, today: string): { date: string; daysAway: number } | null {
-  const starts = profile.periodStartDates ?? [];
-  const last = profile.lastPeriodStart ?? starts[starts.length - 1];
-  if (!starts.length || !last) return null;
-  const cycle = profile.cycleLength || 28;
-  const day = ((dayDiff(last, today) % cycle) + cycle) % cycle + 1;
-  const daysAway = cycle - day + 1;
-  return { date: addDays(today, daysAway), daysAway };
-}
+type Settings = { role?: string; periodReminders?: boolean; phaseTips?: boolean };
 
 Deno.serve(async (request) => {
   const secret = Deno.env.get("CRON_SECRET");
@@ -59,19 +29,17 @@ Deno.serve(async (request) => {
 
   for (const userId of userIds) {
     const { data: state } = await admin.from("user_app_state").select("cycle_profile, app_settings").eq("user_id", userId).maybeSingle();
-    const profile = (state?.cycle_profile ?? {}) as Profile;
+    const profile = (state?.cycle_profile ?? {}) as PushProfile;
     const settings = (state?.app_settings ?? {}) as Settings;
-    if (!settings.periodReminders || settings.role === "partner") continue;
+    if (!settings.periodReminders && !settings.phaseTips) continue;
 
-    const next = nextPeriod(profile, todayIn(profile.timezone || "UTC"));
-    if (!next || !DAYS_BEFORE.includes(next.daysAway)) continue;
+    const message = selectPush(profile, todayIn(profile.timezone || "UTC"), settings);
+    if (!message) continue;
 
-    const { error: logError } = await admin.from("reminder_log").insert({ user_id: userId, period_start: next.date, days_before: next.daysAway });
+    const { error: logError } = await admin.from("reminder_log").insert({ user_id: userId, period_start: message.periodStart, days_before: message.daysBefore });
     if (logError) continue; // already sent for this period
 
-    const when = new Intl.DateTimeFormat("en", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${next.date}T12:00:00Z`));
-    const title = next.daysAway === 1 ? "Your period is expected tomorrow" : "Your period is expected in 2 days";
-    const payload = JSON.stringify({ title, body: `Around ${when}.`, tag: `phasetwo-period-reminder-${next.daysAway}`, url: "/" });
+    const payload = JSON.stringify({ title: message.title, body: message.body, tag: message.tag, url: message.url });
 
     for (const row of (subscriptions ?? []).filter((item) => item.user_id === userId)) {
       try {

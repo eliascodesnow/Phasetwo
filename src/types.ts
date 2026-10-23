@@ -58,6 +58,10 @@ export interface AppSettings {
   personalDetailsPromptSeen?: boolean;
   /** Notify 2 days and 1 day before the predicted period. */
   periodReminders?: boolean;
+  /** Push "cycle tips": a PMS heads-up and a "period may start today" nudge. Off until chosen. */
+  phaseTips?: boolean;
+  /** Show cycle insights on the Today screen. On unless switched off. */
+  inAppTips?: boolean;
   /** True once the user has finished or skipped the app tour. */
   tourCompleted?: boolean;
 }

@@ -90,6 +90,8 @@ export function loadLocalAppState(userId: string): UserAppState {
           ? accountState.appSettings.themeMode
           : "light",
         periodReminders: Boolean(accountState.appSettings?.periodReminders),
+        phaseTips: Boolean(accountState.appSettings?.phaseTips),
+        inAppTips: accountState.appSettings?.inAppTips !== false,
         displayName: typeof accountState.appSettings?.displayName === "string" ? accountState.appSettings.displayName.trim().slice(0, 80) || undefined : undefined,
         age: Number.isInteger(accountState.appSettings?.age) && Number(accountState.appSettings.age) >= 1 && Number(accountState.appSettings.age) <= 120
           ? Number(accountState.appSettings.age)
