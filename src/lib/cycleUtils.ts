@@ -39,7 +39,7 @@ export const PHASES: PhaseInfo[] = [
 
 /** Given a cycle day (1-indexed, wraps at cycleLength), return the active phase. */
 export function phaseForDay(day: number, cycleLength: number): PhaseInfo {
-  // Scale the last (luteal) phase to absorb any difference from the default 28-day length.
+  // Phases are scaled proportionally; luteal always ends on the final day of the cycle.
   const scale = cycleLength / 28;
   const scaled = PHASES.map((p) => ({
     ...p,
@@ -52,10 +52,12 @@ export function phaseForDay(day: number, cycleLength: number): PhaseInfo {
   return found ?? scaled[scaled.length - 1];
 }
 
+/**
+ * Current day of the cycle (1-indexed). Computed from calendar-date keys (noon-anchored)
+ * so it is correct in every timezone and across DST changes.
+ */
 export function currentCycleDay(profile: CycleProfile, asOf: Date = new Date()): number {
-  const start = startOfDay(new Date(profile.lastPeriodStart));
-  const today = startOfDay(asOf);
-  const diff = Math.floor((today.getTime() - start.getTime()) / MS_PER_DAY);
+  const diff = keyDiff(profile.lastPeriodStart.slice(0, 10), dateKey(asOf));
   const cycleLength = profile.cycleLength || 28;
   const dayInCycle = ((diff % cycleLength) + cycleLength) % cycleLength;
   return dayInCycle + 1;
@@ -66,23 +68,40 @@ export function currentPhase(profile: CycleProfile, asOf: Date = new Date()): Ph
   return phaseForDay(day, profile.cycleLength || 28);
 }
 
+/**
+ * Record a new period start. Returns the profile unchanged if the date is invalid or overlaps
+ * an already-recorded period (prevents accidental double taps). Blocking future dates is a UI decision.
+ */
 export function recordPeriodStart(profile: CycleProfile, date: string): CycleProfile {
-  return withPeriodStarts(profile, [...(profile.periodStartDates ?? []), profile.lastPeriodStart, date]);
+  if (!isValidDateKey(date)) return profile;
+  const starts = getStarts(profile);
+  const overlaps = starts.some((start) => {
+    const diff = keyDiff(start, date);
+    return diff >= 0 ? diff < periodSpan(profile, start) : -diff < periodSpan(profile, date);
+  });
+  if (overlaps) return profile;
+  return withPeriodStarts(profile, [...starts, date]);
 }
 
+/** Move a recorded period start. Returns the profile unchanged if either date is invalid or unknown. */
 export function editPeriodStart(profile: CycleProfile, previousDate: string, nextDate: string): CycleProfile {
-  const starts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
-  const moved = withPeriodStarts(profile, starts.map((date) => date === previousDate ? nextDate : date));
+  const starts = getStarts(profile);
+  if (!starts.includes(previousDate) || !isValidDateKey(nextDate)) return profile;
+  const moved = withPeriodStarts(profile, starts.map((date) => (date === previousDate ? nextDate : date)));
   const end = profile.periodEnds?.[previousDate];
   if (!end || previousDate === nextDate) return moved;
   const { [previousDate]: _removed, ...rest } = moved.periodEnds ?? {};
   return { ...moved, periodEnds: end >= nextDate ? { ...rest, [nextDate]: end } : rest };
 }
 
+/**
+ * Remove a recorded period start. The last remaining start can't be removed
+ * (the profile always needs one), so the profile is returned unchanged in that case.
+ */
 export function removePeriodStart(profile: CycleProfile, date: string): CycleProfile {
-  const starts = profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
-  const remaining = starts.filter((start) => start !== date);
-  const next = withPeriodStarts(profile, remaining.length ? remaining : [profile.lastPeriodStart]);
+  const starts = getStarts(profile);
+  if (!starts.includes(date) || starts.length <= 1) return profile;
+  const next = withPeriodStarts(profile, starts.filter((start) => start !== date));
   if (!next.periodEnds?.[date]) return next;
   const { [date]: _removed, ...rest } = next.periodEnds;
   return { ...next, periodEnds: rest };
@@ -97,6 +116,19 @@ function keyDiff(from: string, to: string): number {
   return Math.round((new Date(`${to}T12:00:00`).getTime() - new Date(`${from}T12:00:00`).getTime()) / MS_PER_DAY);
 }
 
+/** True only for real calendar dates in yyyy-mm-dd form (rejects e.g. 2026-13-45 and 2026-02-30). */
+function isValidDateKey(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+/** Recorded period starts, falling back to the legacy single lastPeriodStart. */
+function getStarts(profile: CycleProfile): string[] {
+  return profile.periodStartDates?.length ? profile.periodStartDates : [profile.lastPeriodStart];
+}
+
 /** Number of days a recorded period covers: up to its recorded end, otherwise the usual length. */
 export function periodSpan(profile: Pick<CycleProfile, "periodLength" | "periodEnds">, start: string): number {
   const end = profile.periodEnds?.[start];
@@ -105,8 +137,7 @@ export function periodSpan(profile: Pick<CycleProfile, "periodLength" | "periodE
 
 /** The recorded period start whose window contains the given day, if any. */
 export function periodStartContaining(profile: CycleProfile, key: string): string | undefined {
-  const starts = profile.periodStartDates ?? [];
-  return starts.find((start) => {
+  return getStarts(profile).find((start) => {
     const elapsed = keyDiff(start, key);
     return elapsed >= 0 && elapsed < periodSpan(profile, start);
   });
@@ -136,13 +167,12 @@ export function daysUntilNextPeriod(profile: CycleProfile, asOf: Date = new Date
 
 function withPeriodStarts(profile: CycleProfile, values: string[]): CycleProfile {
   const starts = [...new Set(values)]
-    .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+    .filter(isValidDateKey)
     .sort((left, right) => left.localeCompare(right));
-  const intervals = starts.slice(1).map((start, index) => {
-    const previous = new Date(`${starts[index]}T12:00:00`);
-    const current = new Date(`${start}T12:00:00`);
-    return Math.round((current.getTime() - previous.getTime()) / MS_PER_DAY);
-  }).filter((days) => days >= 20 && days <= 45);
+  const intervals = starts
+    .slice(1)
+    .map((start, index) => keyDiff(starts[index], start))
+    .filter((days) => days >= 20 && days <= 45);
   const recentIntervals = intervals.slice(-6);
   const cycleLength = recentIntervals.length
     ? Math.round(recentIntervals.reduce((total, days) => total + days, 0) / recentIntervals.length)
@@ -195,12 +225,8 @@ function formatDateKey(date: Date): string {
 }
 
 export function nextPeriodEstimate(profile: CycleProfile, asOf: Date = new Date()): Date {
-  const start = startOfDay(new Date(profile.lastPeriodStart));
-  const cycleLength = profile.cycleLength || 28;
-  const day = currentCycleDay(profile, asOf);
-  const daysUntilNext = cycleLength - day + 1;
   const next = new Date(asOf);
-  next.setDate(next.getDate() + daysUntilNext);
+  next.setDate(next.getDate() + daysUntilNextPeriod(profile, asOf));
   return next;
 }
 

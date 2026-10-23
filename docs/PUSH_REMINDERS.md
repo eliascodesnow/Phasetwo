@@ -1,9 +1,34 @@
-# Period reminders (2 days and 1 day before)
+# Notifications: push and in-app
 
-Two layers:
+There are two separate channels with different jobs. Keep content in the right one.
 
-1. **In-app (works now).** When reminders are on and the app is opened 2 days or 1 day before the predicted period, a notification is shown once per reminder.
-2. **Server push (needs setup).** Notifies even when the app is closed.
+| | Push (server) | In-app (Today screen) |
+|---|---|---|
+| Content | `supabase/functions/_shared/pushContent.ts` | `src/lib/notificationContent.ts` |
+| Purpose | Short, time-sensitive nudge | Longer, educational, dismissible insight |
+| Where it shows | Lock screen, even when the app is closed | `InAppNoticeCard`, top of Today |
+| Opt-in | "Period reminders" and "Cycle tips (push)" | "Insights on Today" (on by default) |
+| Must avoid | Fertility, sexual health, mood, health warnings (lock screen is visible to others) | Nothing, but always label dates as estimates and never present a guess as fact |
+| Partners | Never sent | Supportive phase note only |
+
+### Push messages
+
+| Kind | When | Setting | `reminder_log` key |
+|---|---|---|---|
+| `period-2d` | 2 days before predicted period | Period reminders | `(period start, 2)` |
+| `period-1d` | 1 day before | Period reminders | `(period start, 1)` |
+| `pms-heads-up` | 5 days before (cycles of 21+ days) | Cycle tips | `(period start, 5)` |
+| `period-due` | Predicted cycle day 1 | Cycle tips | `(today, 0)` |
+
+At most one push per person per day. `days_before` in `reminder_log` doubles as the message type; no migration is needed.
+
+### In-app notices (most important first)
+
+1. **Attention**: uneven cycles, repeated periods over 7 days, several heavy-flow days. Built only from the person's own logs and never sent as push.
+2. **Phase guide**: one per phase per cycle (menstrual, follicular, estimated ovulation window, luteal, and a PMS window for the last 5 days).
+3. **Daily fact**: rotating library, one per day.
+
+Only one notice is shown per visit. Dismissals are stored on the device (`phasetwo:inapp-notices:<userId>`).
 
 ## Server push setup
 
