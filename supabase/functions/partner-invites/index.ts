@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { allowedOrigins, corsHeadersFor } from "../_shared/cors.ts";
 import { buildInviteLink, INVITE_EXPIRY_DAYS, renderInviteEmail, resolveInviterName } from "../_shared/partnerInvite.ts";
 
 const EIGHT_CHARACTER_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -19,12 +20,31 @@ type InviteRow = {
 };
 
 function corsHeaders(request: Request): HeadersInit {
-  return {
-    "Access-Control-Allow-Origin": request.headers.get("Origin") ?? "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    Vary: "Origin",
+  return corsHeadersFor(request.headers.get("Origin"), allowedOrigins(Deno.env));
+}
+
+// Invitation emails are sent from the PhaseTwo domain to addresses the user types, so cap how many
+// one account can trigger. The log lives in its own table, so revoking an invitation cannot reset it.
+const MAX_SENDS_PER_HOUR = 5;
+const MAX_SENDS_PER_DAY = 10;
+
+async function sendAllowance(serviceClient: ReturnType<typeof createClient>, ownerId: string): Promise<boolean> {
+  const since = (ms: number) => new Date(Date.now() - ms).toISOString();
+  const count = async (iso: string) => {
+    const { count: total, error } = await serviceClient
+      .from("partner_invite_sends")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_user_id", ownerId)
+      .gte("sent_at", iso);
+    if (error) throw error;
+    return total ?? 0;
   };
+  return (await count(since(3_600_000))) < MAX_SENDS_PER_HOUR && (await count(since(86_400_000))) < MAX_SENDS_PER_DAY;
+}
+
+async function recordSend(serviceClient: ReturnType<typeof createClient>, ownerId: string): Promise<void> {
+  const { error } = await serviceClient.from("partner_invite_sends").insert({ owner_user_id: ownerId });
+  if (error) throw error;
 }
 
 function json(request: Request, status: number, payload: Record<string, unknown>): Response {
@@ -169,6 +189,8 @@ Deno.serve(async (request: Request) => {
     if (action === "resend") {
       const invite = await findOwnerInvite(serviceClient, user.id);
       if (!invite) return json(request, 404, { error: "invite_failed" });
+      if (!(await sendAllowance(serviceClient, user.id))) return json(request, 429, { error: "rate_limited" });
+      await recordSend(serviceClient, user.id);
       let expiresAt = invite.expires_at;
       if (new Date(expiresAt).getTime() <= Date.now()) {
         expiresAt = new Date(Date.now() + INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -199,11 +221,16 @@ Deno.serve(async (request: Request) => {
     if (active.error) throw active.error;
     if (active.data) return json(request, 409, { error: "already_linked" });
 
+    if (!(await sendAllowance(serviceClient, user.id))) return json(request, 429, { error: "rate_limited" });
+    await recordSend(serviceClient, user.id);
+
     const pending = await findOwnerInvite(serviceClient, user.id);
     const expiresAt = new Date(Date.now() + INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
     let inviteCode = generateInviteCode();
     let inviteSaved = false;
-    while (!inviteSaved) {
+    // Only a collision on the invite-code index justifies a new code. Any other unique violation
+    // (e.g. a concurrent request already created the pending invitation) must not loop forever.
+    for (let attempt = 0; attempt < 5 && !inviteSaved; attempt += 1) {
       const { error: saveError } = pending
         ? await serviceClient
           .from("cycle_invitations")
@@ -214,8 +241,10 @@ Deno.serve(async (request: Request) => {
           .insert({ owner_user_id: user.id, invited_email: email, invite_code: inviteCode, expires_at: expiresAt });
       if (!saveError) inviteSaved = true;
       else if (saveError.code !== "23505") throw saveError;
+      else if (!/invite_code/.test(`${saveError.message ?? ""} ${saveError.details ?? ""}`)) return json(request, 409, { error: "invite_conflict" });
       else inviteCode = generateInviteCode();
     }
+    if (!inviteSaved) return json(request, 500, { error: "invite_failed" });
 
     const invite = await findOwnerInvite(serviceClient, user.id);
     if (!invite) return json(request, 500, { error: "invite_failed" });

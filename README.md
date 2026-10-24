@@ -71,6 +71,16 @@ cross-device sync, and partner invitations:
      conflicting authenticated table grants while retaining RLS and service-role
      access for invite management.
 
+   - `0010_push_reminders.sql`: Web Push subscriptions and the reminder log.
+   - `0011_security_hardening.sql`: Security fixes. Partner codes now only work for the
+     invited, email-confirmed account and lock out after 10 wrong guesses per hour; invite
+     emails are rate limited; push endpoints must belong to a real browser push service;
+     community posts and profiles can no longer be deleted by clients, and hidden or removed
+     content is no longer editable. **Deploy the edge functions in the same release**:
+     `accept_cycle_invitation` now returns `{ ok: false, error }` for wrong codes (instead of
+     raising), which the updated client expects, and `partner-invites` needs the new
+     `partner_invite_sends` table. Tests: `supabase/tests/0011_security_hardening.test.sql`.
+
    For an existing project, check its migration history first and apply only
    migrations that have not already been recorded. Review and back up existing
    data before applying schema changes; `0002` makes several existing symptom
@@ -116,8 +126,14 @@ supabase functions deploy partner-invites
 
 Choose a model supported by OpenRouter's chat completions API; PhaseTwo does not
 select or hard-code a model. The daily message limit defaults to 10 if omitted.
-The legacy partner-advice function also uses server secrets and, if enabled,
-requires `OPENROUTER_FALLBACK_MODEL`, `FREE_DAILY_LIMIT`, and `PLUS_DAILY_LIMIT`.
+The Partner Advice function (`ai-chat`) builds its own prompt on the server from validated
+cycle fields, shares the daily counter with Ask Bella, and optionally uses
+`OPENROUTER_FALLBACK_MODEL`, `FREE_DAILY_LIMIT` and `PLUS_DAILY_LIMIT`.
+
+Edge functions only answer browser requests from PhaseTwo's own origins
+(`phasetwo.space`, `www.phasetwo.space`, `phasetwo-omega.vercel.app` and localhost). To add
+another origin, such as a Vercel preview URL, set a comma-separated secret:
+`supabase secrets set ALLOWED_ORIGINS=https://phasetwo.space,https://my-preview.vercel.app`.
 
 Bella is an educational assistant, not a clinician. It cannot diagnose or rule
 out endometriosis or another condition, prescribe medication, or recommend

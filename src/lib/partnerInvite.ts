@@ -9,7 +9,10 @@ export type PartnerInviteErrorCode =
   | "invalid_or_expired_code"
   | "cannot_accept_own_invite"
   | "already_linked_partner"
-  | "not_authenticated";
+  | "not_authenticated"
+  | "rate_limited"
+  | "invite_conflict"
+  | "too_many_attempts";
 
 export function formatInviteCode(value: string): string {
   const normalized = value.replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase();
@@ -41,6 +44,12 @@ export function mapPartnerInviteError(code: string | null | undefined): string {
       return "This account is already linked to a partner.";
     case "not_authenticated":
       return "Please sign in before accepting a partner code.";
+    case "rate_limited":
+      return "You have sent several invitations recently. Please try again later.";
+    case "invite_conflict":
+      return "An invitation was just created. Refresh and try again.";
+    case "too_many_attempts":
+      return "Too many incorrect codes. Please wait an hour and try again.";
     default:
       return "We couldn’t create that invitation. Please try again.";
   }
@@ -52,6 +61,7 @@ const KNOWN_ACCEPT_ERRORS = new Set<string>([
   "already_linked",
   "already_linked_partner",
   "not_authenticated",
+  "too_many_attempts",
 ]);
 
 /** Friendly message for a failed accept_cycle_invitation call (the RPC raises the code as its message). */

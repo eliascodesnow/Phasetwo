@@ -203,10 +203,11 @@ export function SettingsView({
               event.preventDefault();
               if (!supabase || linking) return;
               setLinking(true); setLinkError(""); setLinkNotice("");
-              const { error } = await supabase.rpc("accept_cycle_invitation", { p_code: partnerCode });
+              const { data, error } = await supabase.rpc("accept_cycle_invitation", { p_code: partnerCode });
               setLinking(false);
-              if (error) {
-                setLinkError(mapPartnerAcceptError(error.message));
+              const refused = (data as { ok?: boolean; error?: string } | null)?.ok === false ? (data as { error?: string }).error : undefined;
+              if (error || refused) {
+                setLinkError(mapPartnerAcceptError(refused ?? error?.message));
                 return;
               }
               setLinkNotice("Partner cycle linked. Your account can now view the shared cycle.");

@@ -53,3 +53,11 @@ describe("partner code deep link", () => {
     expect(mapPartnerAcceptError("some raw postgres error")).toBe("That invite code could not be accepted. Please try again.");
   });
 });
+
+describe("new function error codes", () => {
+  it("maps rate limit and lockout codes", () => {
+    expect(mapPartnerInviteError("rate_limited")).toContain("try again later");
+    expect(mapPartnerAcceptError("too_many_attempts")).toContain("wait an hour");
+    expect(mapPartnerAcceptError("something_else")).toBe("That invite code could not be accepted. Please try again.");
+  });
+});
