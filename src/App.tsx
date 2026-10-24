@@ -37,7 +37,7 @@ const EndometriosisAwareness = lazyNamed(() => import("./components/Endometriosi
 const PeriodCalendar = lazyNamed(() => import("./components/PeriodCalendar"), "PeriodCalendar");
 const HistoryView = lazyNamed(() => import("./components/HistoryView"), "HistoryView");
 const SettingsView = lazyNamed(() => import("./components/SettingsView"), "SettingsView");
-const PartnerAdviceLauncher = lazyNamed(() => import("./components/PartnerAdviceLauncher"), "PartnerAdviceLauncher");
+const AriKnowsLauncher = lazyNamed(() => import("./components/AriKnowsLauncher"), "AriKnowsLauncher");
 const AskBellaLauncher = lazyNamed(() => import("./components/AskBellaLauncher"), "AskBellaLauncher");
 const Analytics = lazy(() => import("@vercel/analytics/react").then((module) => ({ default: module.Analytics })));
 
@@ -484,7 +484,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       {tourOpen && <Suspense fallback={null}><AppTour role={settings.role} onNavigate={(view) => { setActiveView(view); window.scrollTo({ top: 0 }); }} onClose={closeTour} /></Suspense>}
 
       {settings.role === "self" && <Suspense fallback={null}><AskBellaLauncher isAuthenticated={isAuthenticated} onSignIn={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} /></Suspense>}
-      {showLdr && <Suspense fallback={null}><PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} /></Suspense>}
+      {settings.role === "partner" && <Suspense fallback={null}><AriKnowsLauncher profile={sharedCycleProfile ?? profile} messages={messages} onMessagesChange={setMessages} isAuthenticated={isAuthenticated} /></Suspense>}
 
       {!isAuthenticated && !settings.personalDetailsPromptSeen && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/70 p-4 backdrop-blur-sm">
         <section role="dialog" aria-modal="true" aria-labelledby="personal-details-title" className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl sm:p-7">
