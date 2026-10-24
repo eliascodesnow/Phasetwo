@@ -1,53 +1,32 @@
 import type { ChatMessage, CycleProfile, PhaseInfo, UserRole } from "../types";
 import { supabase } from "./supabase";
 
-export function buildSystemPrompt(
-  profile: CycleProfile,
-  phase: PhaseInfo,
-  cycleDay: number,
-  role: UserRole
-): string {
-  const subject = role === "partner" ? profile.ownerLabel || "your partner" : "the user";
-  const audience =
-    role === "partner"
-      ? `You are advising the user on how to support ${subject}, who is on Day ${cycleDay} of her cycle — ${phase.label} phase.`
-      : `You are advising the user directly about their own Day ${cycleDay}, ${phase.label} phase.`;
+/** The structured context the server turns into the assistant's system prompt (the client never sends a prompt). */
+export interface AdviceContext {
+  role: UserRole;
+  cycleDay: number;
+  cycleLength: number;
+  phase: PhaseInfo["key"];
+  ownerLabel: string;
+}
 
-  return [
-    "You are the PhaseTwo Partner Advice Bot: a grounded, practical, empathetic assistant.",
-    audience,
-    `Current context: Day ${cycleDay} of a ${profile.cycleLength}-day cycle — ${phase.label} phase (${phase.energy} energy).`,
-    `Biological summary: ${phase.summary}`,
-    "Give specific, actionable suggestions — support gestures, meal ideas, or emotional check-ins — tuned to this phase.",
-    "Keep responses concise (3-6 sentences or a short list). Never make medical claims or diagnoses. Avoid generic platitudes.",
-    "If asked something unrelated to the relationship, cycle, or care, answer briefly and steer back to being useful for this context.",
-  ].join("\n");
+export function buildAdviceContext(profile: CycleProfile, phase: PhaseInfo, cycleDay: number, role: UserRole): AdviceContext {
+  return { role, cycleDay, cycleLength: profile.cycleLength, phase: phase.key, ownerLabel: role === "partner" ? profile.ownerLabel ?? "" : "" };
 }
 
 export interface SendMessageParams {
-  systemPrompt: string;
+  context: AdviceContext;
   history: ChatMessage[];
   message: string;
-  requiresPlus?: boolean;
 }
 
-export async function sendChatMessage({
-  systemPrompt,
-  history,
-  message,
-  requiresPlus = false,
-}: SendMessageParams): Promise<string> {
+export async function sendChatMessage({ context, history, message }: SendMessageParams): Promise<string> {
   if (!supabase) {
     throw new Error("AI service is not configured. Add your Supabase environment variables.");
   }
 
   const { data, error } = await supabase.functions.invoke<{ text?: string; error?: string }>("ai-chat", {
-    body: {
-      systemPrompt,
-      history,
-      message,
-      requiresPlus,
-    },
+    body: { context, history: history.map(({ role, text }) => ({ role, text })), message },
   });
 
   if (error) {

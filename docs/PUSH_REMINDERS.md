@@ -9,7 +9,7 @@ Two layers:
 
 1. Generate VAPID keys: `npx web-push generate-vapid-keys`
 2. Vercel env: `VITE_VAPID_PUBLIC_KEY=<public key>`, then redeploy.
-3. Run migration `supabase/migrations/0010_push_reminders.sql`.
+3. Run migrations `supabase/migrations/0010_push_reminders.sql` and `0011_security_hardening.sql` (the latter restricts push endpoints to real push services and adds `register_push_subscription`).
 4. Set function secrets:
    `supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:mail@phasetwo.space CRON_SECRET=<long random string>`
 5. Deploy: `supabase functions deploy period-reminders --no-verify-jwt`
@@ -27,3 +27,5 @@ select cron.schedule(
 ```
 
 The function sends at most one reminder per user per period per lead time (`reminder_log` keyed by user, period and days before) and removes dead subscriptions.
+
+The function only contacts endpoints on known push-service hosts (FCM, Mozilla, Apple, Windows), times each push out after 10 seconds, and releases the day's reminder claim if nothing was delivered so the next run retries. `CRON_SECRET` is compared in constant time.

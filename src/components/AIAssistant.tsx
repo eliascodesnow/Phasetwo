@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, MessageCircle, PackageOpen } from "lucide-react";
 import type { ChatMessage, CycleProfile, UserRole } from "../types";
-import { buildSystemPrompt, carePackagePrompt, sendChatMessage } from "../lib/ai";
+import { buildAdviceContext, carePackagePrompt, sendChatMessage } from "../lib/ai";
 import { currentCycleDay, phaseForDay } from "../lib/cycleUtils";
 
 export function AIAssistant({
@@ -41,9 +41,8 @@ export function AIAssistant({
     setPending(true);
 
     try {
-      const systemPrompt = buildSystemPrompt(profile, phase, day, role);
       const reply = await sendChatMessage({
-        systemPrompt,
+        context: buildAdviceContext(profile, phase, day, role),
         history: messages,
         message: t,
       });

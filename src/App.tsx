@@ -14,7 +14,7 @@ import { recordPeriodStart } from "./lib/cycleUtils";
 import { useScrollLock } from "./lib/scrollLock";
 import { useSwipeNavigation } from "./lib/swipeNav";
 import { pendingPartnerCode } from "./lib/partnerInvite";
-import { sendDueReminder } from "./lib/notifications";
+import { releasePushSubscription, sendDueReminder } from "./lib/notifications";
 import type { SymptomLog } from "./lib/symptoms";
 import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
 
@@ -101,6 +101,10 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [detailsAge, setDetailsAge] = useState("");
   const [detailsError, setDetailsError] = useState("");
   const deletingAccount = useRef(false);
+  // True while the last attempt to load the account's synced data failed. Nothing may be written to the
+  // server in that state, otherwise empty or stale local data would replace the real cloud copy.
+  const syncLoadFailed = useRef(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const symptomSaveAction = useRef<SymptomLoggerSaveRef["current"]>(null);
   useScrollLock(appReady && !isAuthenticated && !settings.personalDetailsPromptSeen);
 
@@ -187,6 +191,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     void loadSyncedAppState(userId)
       .then((state) => {
         if (ignore) return;
+        syncLoadFailed.current = false;
         setProfile(state.cycleProfile);
         setTasks(state.tasks);
         setSettings(state.appSettings);
@@ -194,12 +199,13 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       })
       .catch((error: unknown) => {
         if (ignore) return;
+        syncLoadFailed.current = userId !== LOCAL_GUEST_ID;
         const localState = loadLocalAppState(userId);
         setProfile(localState.cycleProfile);
         setTasks(localState.tasks);
         setSettings(localState.appSettings);
         setMessages(localState.chatMessages);
-        setSyncError(error instanceof Error ? error.message : "Unable to load synced data.");
+        setSyncError("We couldn't load your synced data, so changes are kept on this device only. Retrying…");
       })
       .finally(() => {
         if (!ignore) setAppReady(true);
@@ -208,7 +214,13 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     return () => {
       ignore = true;
     };
-  }, [userId]);
+  }, [userId, loadAttempt]);
+
+  useEffect(() => {
+    if (!appReady || !syncLoadFailed.current) return;
+    const timer = window.setTimeout(() => setLoadAttempt((attempt) => attempt + 1), 15_000);
+    return () => window.clearTimeout(timer);
+  }, [appReady, loadAttempt]);
 
   useEffect(() => {
     if (!appReady || !supabase || !isAuthenticated) return;
@@ -217,10 +229,14 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     async function refreshSharedCycle() {
       const { data, error } = await supabase!.rpc("get_my_shared_cycle_profile");
       if (ignore) return;
-      if (error || !data || typeof data !== "object") {
+      if (error) {
+        // A network or server error says nothing about the link: keep the role and show the last known data.
+        if (settings.role === "partner") setSyncError("Partner sync is temporarily unavailable. Your account data is unchanged.");
+        return;
+      }
+      if (!data || typeof data !== "object") {
         setSharedCycleProfile(null);
         setSettings((current) => current.role === "partner" ? { ...current, role: "self" } : current);
-        if (error && settings.role === "partner") setSyncError("Partner sync is temporarily unavailable. Your account data is unchanged.");
         return;
       }
       const remote = data as Partial<CycleProfile>;
@@ -252,6 +268,10 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     };
     const timer = window.setTimeout(() => {
       if (deletingAccount.current) return;
+      if (syncLoadFailed.current) {
+        saveLocalAppState(userId, state);
+        return;
+      }
       void saveSyncedAppState(userId, state)
         .then(() => {
           setSyncError("");
@@ -267,6 +287,11 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   async function saveWorkspace() {
     setSaving(true);
     setSyncError("");
+    if (syncLoadFailed.current) {
+      setSyncError("Your synced data hasn't loaded yet, so saving to your account is paused. Your changes are kept on this device.");
+      setSaving(false);
+      return;
+    }
     try {
       const symptomSaved = settings.role !== "self" || await symptomSaveAction.current?.() !== false;
       await saveSyncedAppState(userId, { cycleProfile: profile, tasks, appSettings: settings, chatMessages: messages });
@@ -321,14 +346,22 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   }
 
   async function signOut() {
-    if (appReady) {
+    let synced = appReady && !syncLoadFailed.current;
+    if (appReady && !syncLoadFailed.current) {
       try {
         await saveSyncedAppState(userId, { cycleProfile: profile, tasks, appSettings: settings, chatMessages: messages });
       } catch (error) {
+        synced = false;
         setSyncError(error instanceof Error ? error.message : "Unable to sync before sign out.");
       }
     }
+    // Stop this device's reminders for the account (needs the session, so before signing out).
+    try { await releasePushSubscription(); } catch { /* best effort */ }
     await supabase?.auth.signOut();
+    // Remove the account's health data from this browser, but only once it is safely on the server.
+    if (synced && userId !== LOCAL_GUEST_ID) {
+      try { clearLocalUserData(userId); } catch { /* storage unavailable */ }
+    }
   }
 
   async function deleteAccount() {
@@ -357,7 +390,8 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   async function refreshPartnerLink() {
     if (!supabase) return;
     const { data, error } = await supabase.rpc("get_my_shared_cycle_profile");
-    if (error || !data || typeof data !== "object") {
+    if (error) return;
+    if (!data || typeof data !== "object") {
       setSharedCycleProfile(null);
       setSettings((current) => ({ ...current, role: "self" }));
       return;
