@@ -11,6 +11,7 @@ import {
   type BellaSymptomLog,
 } from "../_shared/bella.ts";
 import { BELLA_SYSTEM_PROMPT } from "../_shared/bellaPrompt.ts";
+import { allowedOrigins, corsHeadersFor } from "../_shared/cors.ts";
 
 type HistoryItem = { role: "user" | "assistant"; content: string };
 type RequestBody = { message?: unknown; history?: unknown; conversationId?: unknown };
@@ -24,12 +25,7 @@ const MAX_HISTORY_ITEM_LENGTH = 1_200;
 const MAX_REQUEST_BYTES = 16_000;
 
 function corsHeaders(request: Request): HeadersInit {
-  return {
-    "Access-Control-Allow-Origin": request.headers.get("Origin") ?? "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Vary": "Origin",
-  };
+  return corsHeadersFor(request.headers.get("Origin"), allowedOrigins(Deno.env));
 }
 
 function json(request: Request, status: number, payload: Record<string, unknown>): Response {

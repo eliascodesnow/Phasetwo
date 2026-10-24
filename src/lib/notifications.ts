@@ -37,10 +37,14 @@ async function subscribeForPush(): Promise<void> {
       ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(VAPID_PUBLIC_KEY) as BufferSource });
     const json = subscription.toJSON();
     if (json.endpoint && json.keys?.p256dh && json.keys.auth) {
-      await supabase.from("push_subscriptions").upsert(
-        { user_id: user.id, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth, user_agent: navigator.userAgent.slice(0, 200) },
-        { onConflict: "endpoint" },
-      );
+      // The RPC moves this device's subscription to whoever is signed in now (a plain upsert is refused by RLS
+      // when another account used the same browser before).
+      await supabase.rpc("register_push_subscription", {
+        p_endpoint: json.endpoint,
+        p_p256dh: json.keys.p256dh,
+        p_auth: json.keys.auth,
+        p_user_agent: navigator.userAgent.slice(0, 200),
+      });
     }
   } catch {
     // The on-open reminder still works without a server push subscription.
@@ -71,6 +75,11 @@ export async function disableReminders(): Promise<void> {
   } catch {
     // Nothing to clean up if the browser has no subscription.
   }
+}
+
+/** Call before sign-out: removes this device's server push subscription so reminders stop for the old account. */
+export async function releasePushSubscription(): Promise<void> {
+  await disableReminders();
 }
 
 function alreadySent(key: string): boolean {

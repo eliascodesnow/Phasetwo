@@ -8,6 +8,7 @@ import {
   resolveRelationship,
   sanitizeAriReply,
 } from "../_shared/ariPrompt.ts";
+import { allowedOrigins, corsHeadersFor } from "../_shared/cors.ts";
 import { dayDiff, phaseOfDay, todayIn } from "../_shared/pushContent.ts";
 
 type HistoryItem = { role: "user" | "assistant"; content: string };
@@ -23,12 +24,7 @@ const MAX_REQUEST_BYTES = 12_000;
 const MAX_TOKENS = 380;
 
 function corsHeaders(request: Request): HeadersInit {
-  return {
-    "Access-Control-Allow-Origin": request.headers.get("Origin") ?? "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    Vary: "Origin",
-  };
+  return corsHeadersFor(request.headers.get("Origin"), allowedOrigins(Deno.env));
 }
 
 const json = (request: Request, status: number, payload: Record<string, unknown>) =>
@@ -84,19 +80,6 @@ async function callOpenRouter(model: string, apiKey: string, messages: ModelMess
   } finally {
     clearTimeout(timeout);
   }
-}
-
-async function consumeDailyLimit(service: ReturnType<typeof createClient>, userId: string, limit: number): Promise<boolean> {
-  const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await service.from("ai_usage").select("request_count").eq("user_id", userId).eq("DAY", today).maybeSingle();
-  if (error && error.code !== "PGRST116") throw new Error("USAGE_LIMIT_UNAVAILABLE");
-  const count = Number(data?.request_count ?? 0);
-  if (count >= limit) return false;
-  const { error: writeError } = await service
-    .from("ai_usage")
-    .upsert({ user_id: userId, DAY: today, request_count: count + 1 }, { onConflict: "user_id,DAY" });
-  if (writeError) throw new Error("USAGE_LIMIT_UNAVAILABLE");
-  return true;
 }
 
 Deno.serve(async (request: Request) => {
@@ -158,10 +141,10 @@ Deno.serve(async (request: Request) => {
 
     const limitValue = Number(Deno.env.get("ARI_DAILY_LIMIT") ?? "30");
     const limit = Number.isInteger(limitValue) && limitValue > 0 ? Math.min(limitValue, 500) : 30;
-    const service = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    if (!(await consumeDailyLimit(service, userData.user.id, limit))) {
+    // Atomic counter shared with Ask Bella (public.ai_usage); Ari and Bella draw from the same daily allowance.
+    const { data: allowed, error: usageError } = await userClient.rpc("consume_bella_daily_limit", { p_limit: limit });
+    if (usageError) throw new Error("USAGE_LIMIT_UNAVAILABLE");
+    if (allowed !== true) {
       log(429, "daily_limit");
       return json(request, 429, { error: "DAILY_LIMIT_REACHED" });
     }
