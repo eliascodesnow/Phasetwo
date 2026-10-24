@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { HeartPulse, Info, Lightbulb, X } from "lucide-react";
+import { HeartPulse, Lightbulb, X } from "lucide-react";
 import type { CycleProfile } from "../types";
 import type { SymptomLog } from "../lib/symptoms";
 import { markNoticeSeen, nextInAppNotice, readSeenNotices, type NoticeKind } from "../lib/notificationContent";
@@ -13,11 +13,10 @@ interface Props {
 
 const KIND_LABEL: Record<NoticeKind, string> = {
   attention: "Worth knowing",
-  phase: "Where you are in your cycle",
   tip: "Did you know?",
 };
 
-const KIND_ICON = { attention: HeartPulse, phase: Info, tip: Lightbulb } as const;
+const KIND_ICON = { attention: HeartPulse, tip: Lightbulb } as const;
 
 /**
  * Shows at most one insight per visit. Dismissing it hides it for good (this device) and does not
@@ -54,25 +53,12 @@ export function InAppNoticeCard({ profile, role, userId, logs }: Props) {
           <h2 className="mt-0.5 font-display text-base font-semibold leading-tight text-zinc-900">{notice.title}</h2>
           <p className="mt-1.5 text-sm leading-6 text-zinc-600">{notice.body}</p>
 
-          {notice.tips && notice.tips.length > 0 && (
-            <details className="group mt-3">
-              <summary className="inline-flex min-h-9 cursor-pointer items-center text-sm font-medium text-sage-dark outline-none focus-visible:ring-2 focus-visible:ring-sage/40">
-                <span className="group-open:hidden">Show tips</span>
-                <span className="hidden group-open:inline">Hide tips</span>
-              </summary>
-              <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-6 text-zinc-600">
-                {notice.tips.map((tip) => <li key={tip}>{tip}</li>)}
-              </ul>
-            </details>
-          )}
-
           {notice.caution && (
             <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-[13px] leading-5 text-rose-900">{notice.caution}</p>
           )}
 
           <p className="mt-3 text-xs text-zinc-500">
             General information, not medical advice.
-            {notice.source && <> Source: <a href={notice.source.url} target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-2">{notice.source.label}</a></>}
           </p>
         </div>
         <button

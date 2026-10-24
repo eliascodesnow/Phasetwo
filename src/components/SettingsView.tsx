@@ -183,7 +183,7 @@ export function SettingsView({
             id="phase-tips-heading"
             icon={settings.phaseTips ? Bell : BellOff}
             title="Cycle tips (push)"
-            description={settings.phaseTips ? "On · a heads-up before PMS days and when your period may start" : "Off · occasional notifications, even when the app is closed"}
+            description={settings.phaseTips ? "On · a few gentle ideas now and then, a PMS heads-up, and a nudge when your period may start" : "Off · occasional ideas and nudges, even when the app is closed"}
             checked={Boolean(settings.phaseTips)}
             disabled={reminderPermission === "unsupported"}
             onChange={(on) => void togglePhaseTips(on)}

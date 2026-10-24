@@ -15,47 +15,33 @@ const profile: CycleProfile = {
 const on = (day: number) => new Date(2026, 9, day, 9);
 const self = (asOf: Date, extra: Partial<Parameters<typeof inAppNotices>[0]> = {}) => inAppNotices({ profile, role: "self", asOf, ...extra });
 
-describe("in-app phase notices", () => {
-  it("shows the phase guide first, scoped to the current cycle", () => {
-    const [first] = self(on(3));
-    expect(first).toMatchObject({ kind: "phase", phase: "menstrual", id: "phase:menstrual:2026-10-01" });
-    expect(first.tips?.length).toBeGreaterThan(0);
-  });
-
-  it("scopes ids per cycle so the guide returns next cycle but not again today", () => {
-    const thisCycle = self(on(3))[0].id;
-    const nextCycle = self(new Date(2026, 10, 1, 9))[0].id;
-    expect(nextCycle).not.toBe(thisCycle);
-    expect(self(on(4))[0].id).toBe(thisCycle);
-  });
-
-  it("labels fertility information as an estimate and mentions contraception", () => {
-    const ovulatory = self(on(14))[0];
-    expect(ovulatory.title).toBe("Estimated ovulation window");
-    expect(ovulatory.body).toMatch(/estimate/i);
-    expect(ovulatory.tips?.join(" ")).toMatch(/contraception/i);
-  });
-
-  it("switches to the PMS window in the last 5 days before the period", () => {
-    expect(self(on(23))[0].title).toBe("Luteal phase (estimated)");
-    const pms = self(on(24))[0];
-    expect(pms.title).toBe("PMS window (estimated)");
-    expect(pms.body).toMatch(/in about 5 days/);
-    expect(pms.caution).toMatch(/PMDD/);
-    expect(self(on(28))[0].body).toMatch(/in about 1 day\./);
-  });
-
-  it("always cites a source for the self-facing guides", () => {
-    for (const day of [3, 8, 14, 20, 25]) {
-      expect(self(on(day))[0].source?.url).toMatch(/^https:\/\//);
+describe("the Today card never shows phase guides", () => {
+  it("shows only a daily fact when there is nothing to flag, on every day of the cycle", () => {
+    for (let day = 1; day <= 28; day += 1) {
+      const notices = self(new Date(2026, 9, day, 9));
+      expect(notices.map((notice) => notice.kind)).toEqual(["tip"]);
+      expect(notices[0].id.startsWith("phase:")).toBe(false);
     }
+  });
+
+  it("carries no external links or source fields", () => {
+    const heavy = (day: number) => ({ log_date: `2026-10-0${day}`, bleeding: "heavy" }) as SymptomLog;
+    const everything = [...self(on(5), { logs: [heavy(1), heavy(2), heavy(3)] }), ...TIPS.map((tip, index) => ({ id: String(index), ...tip }))];
+    for (const notice of everything) {
+      expect(Object.keys(notice)).not.toContain("source");
+      expect(JSON.stringify(notice)).not.toMatch(/https?:|www\.|\.org\b|\.gov\b|\.uk\b/i);
+    }
+  });
+
+  it("makes no assumptions about work, study or hobbies", () => {
+    for (const tip of TIPS) expect(`${tip.title} ${tip.body}`).not.toMatch(/\b(coding|code|study|studying|homework|exam|work meeting|presentation)s?\b/i);
   });
 });
 
 describe("in-app health signals", () => {
   const heavy = (day: number) => ({ log_date: `2026-10-0${day}`, bleeding: "heavy" }) as SymptomLog;
 
-  it("flags several heavy days, ahead of the phase guide", () => {
+  it("flags several heavy days, ahead of the daily fact", () => {
     const notices = self(on(5), { logs: [heavy(1), heavy(2), heavy(3)] });
     expect(notices[0]).toMatchObject({ kind: "attention", id: "attention:heavy:2026-10-01" });
     expect(notices[0].caution).toMatch(/urgent/i);
@@ -81,25 +67,24 @@ describe("in-app health signals", () => {
     };
     expect(inAppNotices({ profile: long, role: "self", asOf: on(2) }).some((n) => n.id.startsWith("attention:long-period"))).toBe(true);
   });
+
+  it("scopes each flag to the cycle so it can return next cycle but not twice in one", () => {
+    const logs = [heavy(1), heavy(2), heavy(3)];
+    expect(self(on(5), { logs })[0].id).toBe(self(on(6), { logs })[0].id);
+  });
 });
 
 describe("partners", () => {
-  it("get a supportive phase note only, with no fertility detail or health signals", () => {
-    const notices = inAppNotices({ profile: { ...profile, ownerLabel: "Amina" }, role: "partner", asOf: on(14), logs: [{ log_date: "2026-10-12", bleeding: "heavy" }] as SymptomLog[] });
-    expect(notices).toHaveLength(1);
-    expect(notices[0].body).toContain("Amina");
-    expect(notices[0].tips).toBeUndefined();
-    expect(`${notices[0].title} ${notices[0].body}`).not.toMatch(/fertile|contracept|pregnan/i);
-  });
-
-  it("falls back to 'Your partner' when no name is set", () => {
-    expect(inAppNotices({ profile, role: "partner", asOf: on(3) })[0].body).toMatch(/^Your partner /);
+  it("see nothing on the Today card", () => {
+    const logs = [{ log_date: "2026-10-12", bleeding: "heavy" }] as SymptomLog[];
+    expect(inAppNotices({ profile, role: "partner", asOf: on(14), logs })).toEqual([]);
   });
 });
 
-describe("dismissal and daily tips", () => {
+describe("dismissal and daily facts", () => {
   it("moves on to the next notice once one is dismissed, then to nothing", () => {
-    const ctx = { profile, role: "self" as const, asOf: on(3) };
+    const heavy = (day: number) => ({ log_date: `2026-10-0${day}`, bleeding: "heavy" }) as SymptomLog;
+    const ctx = { profile, role: "self" as const, asOf: on(5), logs: [heavy(1), heavy(2), heavy(3)] };
     const all = inAppNotices(ctx);
     const seen = new Set<string>();
     expect(nextInAppNotice(ctx, seen)?.id).toBe(all[0].id);
@@ -109,9 +94,9 @@ describe("dismissal and daily tips", () => {
     expect(nextInAppNotice(ctx, seen)).toBeNull();
   });
 
-  it("rotates the daily tip and has a complete, hedged library", () => {
-    const tipIds = new Set([3, 4, 5, 6].map((day) => self(on(day)).find((n) => n.kind === "tip")!.id));
-    expect(tipIds.size).toBe(4);
+  it("rotates the daily fact and keeps its wording hedged", () => {
+    const ids = new Set([3, 4, 5, 6].map((day) => self(on(day)).find((n) => n.kind === "tip")!.id));
+    expect(ids.size).toBe(4);
     expect(TIPS.length).toBeGreaterThanOrEqual(8);
     for (const tip of TIPS) expect(`${tip.title} ${tip.body}`).not.toMatch(/you will (feel|be)|always|guarantee/i);
   });
