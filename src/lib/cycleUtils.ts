@@ -57,7 +57,8 @@ export function phaseForDay(day: number, cycleLength: number): PhaseInfo {
  * so it is correct in every timezone and across DST changes.
  */
 export function currentCycleDay(profile: CycleProfile, asOf: Date = new Date()): number {
-  const diff = keyDiff(profile.lastPeriodStart.slice(0, 10), dateKey(asOf));
+  const today = profile.viewInOwnerTimezone ? dateKeyInZone(asOf, profile.timezone) : dateKey(asOf);
+  const diff = keyDiff(profile.lastPeriodStart.slice(0, 10), today);
   const cycleLength = profile.cycleLength || 28;
   const dayInCycle = ((diff % cycleLength) + cycleLength) % cycleLength;
   return dayInCycle + 1;
@@ -110,6 +111,18 @@ export function removePeriodStart(profile: CycleProfile, date: string): CyclePro
 /** Local calendar date as yyyy-mm-dd (not UTC, so late-night taps land on the right day). */
 export function dateKey(date: Date = new Date()): string {
   return formatDateKey(date);
+}
+
+/** Calendar date (yyyy-mm-dd) in an IANA timezone; falls back to the device's date if the zone is unknown. */
+export function dateKeyInZone(date: Date, timeZone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+    const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+    const key = `${get("year")}-${get("month")}-${get("day")}`;
+    return isValidDateKey(key) ? key : dateKey(date);
+  } catch {
+    return dateKey(date);
+  }
 }
 
 function keyDiff(from: string, to: string): number {

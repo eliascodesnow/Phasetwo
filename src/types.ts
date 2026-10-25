@@ -18,6 +18,12 @@ export interface CycleProfile {
   timezone: string;
   /** City, used for care-package prompts */
   city: string;
+  /**
+   * Set only on the read-only copy a partner receives. "Today" is then read in the owner's
+   * timezone (profile.timezone), so the partner sees the same cycle day and phase the owner does.
+   * Never saved to an account.
+   */
+  viewInOwnerTimezone?: boolean;
 }
 
 export interface SelfProfile {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classifyDay } from "../components/PeriodCalendar";
-import { calculateWeeklyPeriodStreak, daysUntilNextPeriod, editPeriodStart, energyAtCycleFraction, periodStartContaining, predictedPeriodStarts, recordPeriodEnd, recordPeriodStart, removePeriodStart } from "./cycleUtils";
+import { calculateWeeklyPeriodStreak, currentCycleDay, dateKeyInZone, daysUntilNextPeriod, editPeriodStart, energyAtCycleFraction, periodStartContaining, predictedPeriodStarts, recordPeriodEnd, recordPeriodStart, removePeriodStart } from "./cycleUtils";
 
 describe("period start tracking", () => {
   const profile = {
@@ -144,5 +144,19 @@ describe("period end and predictions", () => {
 
   it("counts days until the next period", () => {
     expect(daysUntilNextPeriod(base, asOf)).toBe(26);
+  });
+});
+
+describe("partner view reads the owner's timezone", () => {
+  const profile = { lastPeriodStart: "2026-10-01", cycleLength: 28, periodLength: 5, ownerLabel: "Her", timezone: "Pacific/Kiritimati", city: "" };
+  // 2026-10-24 23:30 UTC is already 2026-10-25 in Kiritimati (UTC+14) but still the 24th in UTC.
+  const instant = new Date("2026-10-24T23:30:00Z");
+  it("uses the owner's calendar date for the shared copy", () => {
+    expect(currentCycleDay({ ...profile, viewInOwnerTimezone: true }, instant)).toBe(25);
+  });
+  it("reads dates in the named zone and tolerates an unknown one", () => {
+    expect(dateKeyInZone(instant, "UTC")).toBe("2026-10-24");
+    expect(dateKeyInZone(instant, "Pacific/Kiritimati")).toBe("2026-10-25");
+    expect(dateKeyInZone(instant, "Not/AZone")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
