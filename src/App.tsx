@@ -246,7 +246,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         setSettings((current) => ({ ...current, role: "self" }));
         return;
       }
-      setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "" });
+      setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "", viewInOwnerTimezone: true });
     }
 
     void refreshSharedCycle();
@@ -403,7 +403,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       setSettings((current) => ({ ...current, role: "self" }));
       return;
     }
-    setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "" });
+    setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "", viewInOwnerTimezone: true });
     setSettings((current) => ({ ...current, role: "partner", ldrEnabled: true }));
   }
 
