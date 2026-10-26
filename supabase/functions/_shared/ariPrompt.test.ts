@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ARI_OTHER_KEY, ARI_PHASE_GUIDE, ARI_RELATIONSHIPS, buildAriSystemPrompt, cleanOtherLabel, cleanOwnerLabel,
-  resolveRelationship, sanitizeAriReply, type AriContext,
+  resolveRelationship, sanitizeAriReply, trimToLastSentence, type AriContext,
 } from "./ariPrompt";
 import { phaseOfDay } from "./pushContent";
 
@@ -51,6 +51,15 @@ describe("Ari prompt", () => {
     expect(prompt).toMatch(/hormones do not dictate mood/);
     expect(prompt).toMatch(/no symptom logs/);
     expect(prompt).not.toMatch(/https?:\/\//);
+  });
+  it("asks for a short structured answer with no disclaimers", () => {
+    expect(prompt).toMatch(/2 to 3 short bullets/);
+    expect(prompt).toMatch(/NO disclaimers/);
+    expect(prompt).toMatch(/Never stop mid-sentence/);
+  });
+  it("trims a cut-off reply back to the last complete thought", () => {
+    expect(trimToLastSentence("She is likely tired today. Offer a warm drink. Even as the period wraps up and estrogen begins to climb, it")).toBe("She is likely tired today. Offer a warm drink.");
+    expect(trimToLastSentence("All done.")).toBe("All done.");
   });
   it("falls back to neutral wording without an owner label, and tolerates a period due now", () => {
     const text = buildAriSystemPrompt({ ...base, ownerLabel: "", daysUntilPeriod: 0 });

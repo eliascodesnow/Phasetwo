@@ -7,6 +7,7 @@ import {
   cleanOwnerLabel,
   resolveRelationship,
   sanitizeAriReply,
+  trimToLastSentence,
 } from "../_shared/ariPrompt.ts";
 import { allowedOrigins, corsHeadersFor } from "../_shared/cors.ts";
 import { dayDiff, phaseOfDay, todayIn } from "../_shared/pushContent.ts";
@@ -21,7 +22,7 @@ const MAX_HISTORY_ITEMS = 8;
 const MAX_HISTORY_ITEM_LENGTH = 900;
 const MAX_REQUEST_BYTES = 12_000;
 // Short answers keep Ari fast.
-const MAX_TOKENS = 380;
+const MAX_TOKENS = 800;
 
 function corsHeaders(request: Request): HeadersInit {
   return corsHeadersFor(request.headers.get("Origin"), allowedOrigins(Deno.env));
@@ -67,14 +68,15 @@ async function callOpenRouter(model: string, apiKey: string, messages: ModelMess
       signal: controller.signal,
     });
     if (!response.ok) throw new Error("PROVIDER_ERROR");
-    const payload = await response.json() as { choices?: Array<{ message?: { content?: unknown } }> };
+    const payload = await response.json() as { choices?: Array<{ finish_reason?: string; message?: { content?: unknown } }> };
     const content = payload.choices?.[0]?.message?.content;
     const text = typeof content === "string"
       ? content
       : Array.isArray(content)
         ? content.map((part) => (part && typeof part === "object" && "text" in part ? String((part as { text?: unknown }).text ?? "") : "")).join("")
         : "";
-    const clean = sanitizeAriReply(text);
+    const cutOff = payload.choices?.[0]?.finish_reason === "length";
+    const clean = sanitizeAriReply(cutOff ? trimToLastSentence(text) : text);
     if (!clean) throw new Error("EMPTY_RESPONSE");
     return clean;
   } finally {
