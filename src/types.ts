@@ -18,6 +18,12 @@ export interface CycleProfile {
   timezone: string;
   /** City, used for care-package prompts */
   city: string;
+  /**
+   * Set only on the read-only copy a partner receives. "Today" is then read in the owner's
+   * timezone (profile.timezone), so the partner sees the same cycle day and phase the owner does.
+   * Never saved to an account.
+   */
+  viewInOwnerTimezone?: boolean;
 }
 
 export interface SelfProfile {
@@ -58,6 +64,10 @@ export interface AppSettings {
   personalDetailsPromptSeen?: boolean;
   /** Notify 2 days and 1 day before the predicted period. */
   periodReminders?: boolean;
+  /** Push "cycle tips": a PMS heads-up and a "period may start today" nudge. Off until chosen. */
+  phaseTips?: boolean;
+  /** Show cycle insights on the Today screen. On unless switched off. */
+  inAppTips?: boolean;
   /** True once the user has finished or skipped the app tour. */
   tourCompleted?: boolean;
 }

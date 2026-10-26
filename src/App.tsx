@@ -14,12 +14,17 @@ import { recordPeriodStart } from "./lib/cycleUtils";
 import { useScrollLock } from "./lib/scrollLock";
 import { lazyWithReload } from "./lib/lazyLoad";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { useSwipeNavigation } from "./lib/swipeNav";
 import { pendingPartnerCode } from "./lib/partnerInvite";
-import { sendDueReminder } from "./lib/notifications";
+import { releasePushSubscription, sendDueReminder } from "./lib/notifications";
 import type { SymptomLog } from "./lib/symptoms";
 import { WeeklyStreakCard } from "./components/WeeklyStreakCard";
+import { InAppNoticeCard } from "./components/InAppNoticeCard";
 import { GoogleG } from "./components/GoogleG";
+import { TurnstileWidget } from "./components/TurnstileWidget";
+import { turnstileEnabled } from "./lib/turnstile";
 import { PeriodQuickLog } from "./components/PeriodQuickLog";
+import { PhaseTwoLoader } from "./components/PhaseTwoLoader";
 
 // Loaded on demand: the tour is shown once per person, so it should not weigh down the main bundle.
 const AppTour = lazyWithReload(() => import("./components/AppTour").then((module) => ({ default: module.AppTour })));
@@ -34,7 +39,7 @@ const EndometriosisAwareness = lazyNamed(() => import("./components/Endometriosi
 const PeriodCalendar = lazyNamed(() => import("./components/PeriodCalendar"), "PeriodCalendar");
 const HistoryView = lazyNamed(() => import("./components/HistoryView"), "HistoryView");
 const SettingsView = lazyNamed(() => import("./components/SettingsView"), "SettingsView");
-const PartnerAdviceLauncher = lazyNamed(() => import("./components/PartnerAdviceLauncher"), "PartnerAdviceLauncher");
+const AriKnowsLauncher = lazyNamed(() => import("./components/AriKnowsLauncher"), "AriKnowsLauncher");
 const AskBellaLauncher = lazyNamed(() => import("./components/AskBellaLauncher"), "AskBellaLauncher");
 const Analytics = lazyWithReload(() => import("@vercel/analytics/react").then((module) => ({ default: module.Analytics })));
 
@@ -48,6 +53,7 @@ const WORKSPACE_TABS: Array<{ key: WorkspaceView; label: string; icon: typeof Ho
   { key: "history", label: "History", icon: FileText },
   { key: "settings", label: "Settings", icon: Settings },
 ];
+const WORKSPACE_TAB_KEYS = WORKSPACE_TABS.map((tab) => tab.key);
 
 function LegalAcceptanceSync({ userId }: { userId: string | null }) {
   useEffect(() => {
@@ -85,6 +91,8 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [loginError, setLoginError] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
@@ -96,6 +104,10 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   const [detailsAge, setDetailsAge] = useState("");
   const [detailsError, setDetailsError] = useState("");
   const deletingAccount = useRef(false);
+  // True while the last attempt to load the account's synced data failed. Nothing may be written to the
+  // server in that state, otherwise empty or stale local data would replace the real cloud copy.
+  const syncLoadFailed = useRef(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const symptomSaveAction = useRef<SymptomLoggerSaveRef["current"]>(null);
   useScrollLock(appReady && !isAuthenticated && !settings.personalDetailsPromptSeen);
 
@@ -105,6 +117,8 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     const applyTheme = () => {
       const theme = mode === "system" ? (media.matches ? "light" : "dark") : mode;
       document.documentElement.dataset.theme = theme;
+      // Colours the phone's status bar area to match the page (black in dark mode).
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#000000" : "#f8f4f6");
       setResolvedTheme(theme);
     };
     applyTheme();
@@ -180,6 +194,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     void loadSyncedAppState(userId)
       .then((state) => {
         if (ignore) return;
+        syncLoadFailed.current = false;
         setProfile(state.cycleProfile);
         setTasks(state.tasks);
         setSettings(state.appSettings);
@@ -187,12 +202,13 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       })
       .catch((error: unknown) => {
         if (ignore) return;
+        syncLoadFailed.current = userId !== LOCAL_GUEST_ID;
         const localState = loadLocalAppState(userId);
         setProfile(localState.cycleProfile);
         setTasks(localState.tasks);
         setSettings(localState.appSettings);
         setMessages(localState.chatMessages);
-        setSyncError(error instanceof Error ? error.message : "Unable to load synced data.");
+        setSyncError("We couldn't load your synced data, so changes are kept on this device only. Retrying…");
       })
       .finally(() => {
         if (!ignore) setAppReady(true);
@@ -201,7 +217,13 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     return () => {
       ignore = true;
     };
-  }, [userId]);
+  }, [userId, loadAttempt]);
+
+  useEffect(() => {
+    if (!appReady || !syncLoadFailed.current) return;
+    const timer = window.setTimeout(() => setLoadAttempt((attempt) => attempt + 1), 15_000);
+    return () => window.clearTimeout(timer);
+  }, [appReady, loadAttempt]);
 
   useEffect(() => {
     if (!appReady || !supabase || !isAuthenticated) return;
@@ -210,10 +232,14 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     async function refreshSharedCycle() {
       const { data, error } = await supabase!.rpc("get_my_shared_cycle_profile");
       if (ignore) return;
-      if (error || !data || typeof data !== "object") {
+      if (error) {
+        // A network or server error says nothing about the link: keep the role and show the last known data.
+        if (settings.role === "partner") setSyncError("Partner sync is temporarily unavailable. Your account data is unchanged.");
+        return;
+      }
+      if (!data || typeof data !== "object") {
         setSharedCycleProfile(null);
         setSettings((current) => current.role === "partner" ? { ...current, role: "self" } : current);
-        if (error && settings.role === "partner") setSyncError("Partner sync is temporarily unavailable. Your account data is unchanged.");
         return;
       }
       const remote = data as Partial<CycleProfile>;
@@ -222,7 +248,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
         setSettings((current) => ({ ...current, role: "self" }));
         return;
       }
-      setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "" });
+      setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "", viewInOwnerTimezone: true });
     }
 
     void refreshSharedCycle();
@@ -245,6 +271,10 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     };
     const timer = window.setTimeout(() => {
       if (deletingAccount.current) return;
+      if (syncLoadFailed.current) {
+        saveLocalAppState(userId, state);
+        return;
+      }
       void saveSyncedAppState(userId, state)
         .then(() => {
           setSyncError("");
@@ -260,6 +290,11 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   async function saveWorkspace() {
     setSaving(true);
     setSyncError("");
+    if (syncLoadFailed.current) {
+      setSyncError("Your synced data hasn't loaded yet, so saving to your account is paused. Your changes are kept on this device.");
+      setSaving(false);
+      return;
+    }
     try {
       const symptomSaved = settings.role !== "self" || await symptomSaveAction.current?.() !== false;
       await saveSyncedAppState(userId, { cycleProfile: profile, tasks, appSettings: settings, chatMessages: messages });
@@ -293,27 +328,43 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
     setLoginBusy(true);
     setLoginError("");
     setLoginMessage("");
+    if (turnstileEnabled && !captchaToken) {
+      setLoginError("One moment, the security check is still running.");
+      setLoginBusy(false);
+      return;
+    }
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: window.location.origin, ...(captchaToken ? { captchaToken } : {}) },
     });
     if (error) {
       setLoginError(error.message);
     } else {
       setLoginMessage("Check your email.");
     }
+    // A Turnstile token works once, so get a new one for the next attempt.
+    setCaptchaToken(null);
+    setCaptchaResetKey((key) => key + 1);
     setLoginBusy(false);
   }
 
   async function signOut() {
-    if (appReady) {
+    let synced = appReady && !syncLoadFailed.current;
+    if (appReady && !syncLoadFailed.current) {
       try {
         await saveSyncedAppState(userId, { cycleProfile: profile, tasks, appSettings: settings, chatMessages: messages });
       } catch (error) {
+        synced = false;
         setSyncError(error instanceof Error ? error.message : "Unable to sync before sign out.");
       }
     }
+    // Stop this device's reminders for the account (needs the session, so before signing out).
+    try { await releasePushSubscription(); } catch { /* best effort */ }
     await supabase?.auth.signOut();
+    // Remove the account's health data from this browser, but only once it is safely on the server.
+    if (synced && userId !== LOCAL_GUEST_ID) {
+      try { clearLocalUserData(userId); } catch { /* storage unavailable */ }
+    }
   }
 
   async function deleteAccount() {
@@ -342,7 +393,8 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
   async function refreshPartnerLink() {
     if (!supabase) return;
     const { data, error } = await supabase.rpc("get_my_shared_cycle_profile");
-    if (error || !data || typeof data !== "object") {
+    if (error) return;
+    if (!data || typeof data !== "object") {
       setSharedCycleProfile(null);
       setSettings((current) => ({ ...current, role: "self" }));
       return;
@@ -353,15 +405,32 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       setSettings((current) => ({ ...current, role: "self" }));
       return;
     }
-    setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "" });
+    setSharedCycleProfile({ ...defaultCycleProfile, ...remote, city: "", viewInOwnerTimezone: true });
     setSettings((current) => ({ ...current, role: "partner", ldrEnabled: true }));
   }
+
+  const goToTab = (key: WorkspaceView) => {
+    if (key === "today") setEditingLogDate(undefined);
+    setActiveView(key);
+  };
+
+  useSwipeNavigation({
+    enabled: appReady && !tourOpen && activeView !== "login" && activeView !== "report",
+    order: WORKSPACE_TAB_KEYS,
+    current: activeView,
+    onNavigate: (key) => { goToTab(key); window.scrollTo({ top: 0 }); },
+  });
+
+  // The nav scrolls sideways on small screens, so keep the current tab visible after a swipe.
+  useEffect(() => {
+    document.querySelector<HTMLElement>("[data-tour='nav'] [aria-current='page']")?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [activeView]);
 
   const showLdr = settings.role === "partner" && settings.ldrEnabled;
   const displayedProfile = showLdr && sharedCycleProfile ? sharedCycleProfile : profile;
 
   if (!appReady) {
-    return <div role="status" className="flex min-h-screen flex-col items-center justify-center gap-3 text-sm text-zinc-500"><Leaf className="h-6 w-6 animate-pulse text-sage" strokeWidth={1.5} />Loading your workspace…</div>;
+    return <PhaseTwoLoader label="Loading your workspace" />;
   }
 
   return (
@@ -369,14 +438,14 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       {!(activeView === "login" && !isAuthenticated && supabase) && <header className="border-b border-zinc-200 bg-white/95 backdrop-blur backdrop-saturate-150 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3 sm:px-8">
           <div className="flex items-center gap-2 py-1">
-            <Leaf className="w-4.5 h-4.5 text-sage" strokeWidth={1.75} />
+            <PhaseTwoLoader variant="mark" decorative showLabel={false} markClassName="h-8 w-8" className="shrink-0" />
             <span className="font-display text-base font-semibold tracking-tight text-zinc-900">
               PhaseTwo
             </span>
           </div>
           {activeView !== "login" && <nav aria-label="Main navigation" data-tour="nav" className="order-3 flex w-full items-center gap-1 overflow-x-auto sm:order-2 sm:w-auto">
             {WORKSPACE_TABS.map(({ key, label, icon: Icon }) => (
-              <button key={key} type="button" data-tour={`tab-${key}`} aria-current={activeView === key ? "page" : undefined} onClick={() => { if (key === "today") setEditingLogDate(undefined); setActiveView(key); }} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
+              <button key={key} type="button" data-tour={`tab-${key}`} aria-current={activeView === key ? "page" : undefined} onClick={() => goToTab(key)} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${activeView === key ? "bg-sage-light text-sage-dark" : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"}`}>
                 <Icon className="h-4 w-4" strokeWidth={1.8} />{label}
               </button>
             ))}
@@ -398,7 +467,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
 
       <main className="max-w-6xl mx-auto space-y-7 px-4 py-6 pb-10 sm:px-8 sm:py-8">
         <ErrorBoundary resetKey={activeView}>
-        <Suspense fallback={<p role="status" className="py-10 text-center text-sm text-zinc-500">Loading…</p>}>
+        <Suspense fallback={<PhaseTwoLoader variant="inline" label="Loading" />}>
         {!isAuthenticated && supabase && activeView === "login" && <section className="mx-auto mt-6 max-w-sm">
           <h1 className="font-display text-3xl font-bold text-zinc-900">Sign in</h1>
           <button type="button" onClick={() => void handleGoogleSignIn()} disabled={loginBusy} className="mt-8 inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-full border border-zinc-300 bg-white px-4 text-[15px] font-semibold text-zinc-800 transition-[background-color,transform] hover:bg-zinc-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60">
@@ -410,9 +479,10 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
             <label className="block text-sm font-medium text-zinc-700">Email
               <input name="email" type="email" autoComplete="email" required className="mt-1.5 min-h-12 w-full rounded-2xl border border-zinc-300 bg-white px-4 text-base text-zinc-900 outline-none transition focus:border-sage-dark focus:ring-2 focus:ring-sage/20" />
             </label>
+            <TurnstileWidget action="signin" onToken={setCaptchaToken} onError={setLoginError} resetKey={captchaResetKey} />
             {loginError && <p role="alert" className="text-sm text-rose-700">{loginError}</p>}
             {loginMessage && <p role="status" className="text-sm font-medium text-sage-dark">{loginMessage}</p>}
-            <button type="submit" disabled={loginBusy} className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-sage-dark px-4 text-[15px] font-semibold text-white transition-[background-color,transform] hover:bg-sage-darker active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={loginBusy || (turnstileEnabled && !captchaToken)} className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-sage-dark px-4 text-[15px] font-semibold text-white transition-[background-color,transform] hover:bg-sage-darker active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60">
               Email me a link
             </button>
           </form>
@@ -423,6 +493,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
             <div><p className="text-sm font-medium text-sage-dark">{new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date())}</p><h1 className="mt-1 font-display text-2xl font-bold text-zinc-900">Today</h1>{settings.displayName && <p className="mt-1 text-sm text-zinc-600">Hello, {settings.displayName}</p>}</div>
                       </div>
           <CycleHeader profile={displayedProfile} />
+          {settings.inAppTips !== false && <InAppNoticeCard profile={displayedProfile} role={settings.role} userId={userId} logs={settings.role === "self" ? symptomLogs : undefined} />}
           {settings.role === "self" && isAuthenticated && <WeeklyStreakCard weeks={weeklyLoginStreak} />}
           {settings.role === "self" && <PeriodQuickLog profile={profile} onChange={setProfile} />}
           <PeriodCalendar profile={displayedProfile} logs={settings.role === "self" ? symptomLogs : []} showRecordButton={settings.role === "self"} onRecordPeriodStart={(date) => setProfile((current) => recordPeriodStart(current, date))} onProfileChange={setProfile} onEditLog={(date) => { setEditingLogDate(date); setFocusCheckin(true); }} />
@@ -451,7 +522,7 @@ function WorkspaceApp({ userId, isAuthenticated, weeklyLoginStreak }: { userId: 
       {tourOpen && <Suspense fallback={null}><AppTour role={settings.role} onNavigate={(view) => { setActiveView(view); window.scrollTo({ top: 0 }); }} onClose={closeTour} /></Suspense>}
 
       {settings.role === "self" && <Suspense fallback={null}><AskBellaLauncher isAuthenticated={isAuthenticated} onSignIn={() => { setLoginError(""); setLoginMessage(""); setActiveView("login"); }} /></Suspense>}
-      {showLdr && <Suspense fallback={null}><PartnerAdviceLauncher profile={displayedProfile} messages={messages} onMessagesChange={setMessages} /></Suspense>}
+      {settings.role === "partner" && <Suspense fallback={null}><AriKnowsLauncher profile={sharedCycleProfile ?? profile} messages={messages} onMessagesChange={setMessages} isAuthenticated={isAuthenticated} /></Suspense>}
 
       {!isAuthenticated && !settings.personalDetailsPromptSeen && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/70 p-4 backdrop-blur-sm">
         <section role="dialog" aria-modal="true" aria-labelledby="personal-details-title" className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl sm:p-7">

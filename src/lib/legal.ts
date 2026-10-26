@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 
 /** Bump when the Terms of Service or Privacy Policy change in a way people must re-accept. Keep in sync with public/privacy.html and public/terms.html. */
-export const LEGAL_VERSION = "2026-10-20";
+export const LEGAL_VERSION = "2026-10-24";
 export const PRIVACY_URL = "/privacy";
 export const TERMS_URL = "/terms";
 

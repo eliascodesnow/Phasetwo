@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Trash2, Bell, BellOff, Check } from "lucide-react";
+import { AlertTriangle, Trash2, Bell, BellOff, Check, Lightbulb } from "lucide-react";
 import type { AppSettings, CycleProfile, ThemeMode } from "../types";
 import { MEDICAL_DISCLAIMER } from "../lib/endoContent";
 import { editPeriodStart } from "../lib/cycleUtils";
@@ -87,14 +87,25 @@ export function SettingsView({
   }
   const [reminderPermission, setReminderPermission] = useState<ReminderSupport>(reminderSupport());
 
+  // Period reminders and push cycle tips share one device subscription, so it is only removed once both are off.
   async function toggleReminders(on: boolean) {
     if (!on) {
-      await disableReminders();
+      if (!settings.phaseTips) await disableReminders();
       return onSettingsChange({ ...settings, periodReminders: false });
     }
     const permission = await enableReminders();
     setReminderPermission(permission);
     onSettingsChange({ ...settings, periodReminders: permission === "granted" });
+  }
+
+  async function togglePhaseTips(on: boolean) {
+    if (!on) {
+      if (!settings.periodReminders) await disableReminders();
+      return onSettingsChange({ ...settings, phaseTips: false });
+    }
+    const permission = await enableReminders();
+    setReminderPermission(permission);
+    onSettingsChange({ ...settings, phaseTips: permission === "granted" });
   }
 
   async function deleteAccount() {
@@ -166,6 +177,28 @@ export function SettingsView({
         {reminderPermission === "unsupported" && <p className="mt-3 text-xs text-zinc-500">This browser does not support notifications.</p>}
       </section>
 
+      <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-card sm:p-5" aria-label="Tips and insights">
+        {settings.role !== "partner" && (
+          <SwitchRow
+            id="phase-tips-heading"
+            icon={settings.phaseTips ? Bell : BellOff}
+            title="Cycle tips (push)"
+            description={settings.phaseTips ? "On · a few gentle ideas now and then, a PMS heads-up, and a nudge when your period may start" : "Off · occasional ideas and nudges, even when the app is closed"}
+            checked={Boolean(settings.phaseTips)}
+            disabled={reminderPermission === "unsupported"}
+            onChange={(on) => void togglePhaseTips(on)}
+          />
+        )}
+        <SwitchRow
+          id="in-app-tips-heading"
+          icon={Lightbulb}
+          title="Insights on Today"
+          description={settings.inAppTips !== false ? "On · one short, dismissible insight at a time" : "Off · no insights on the Today screen"}
+          checked={settings.inAppTips !== false}
+          onChange={(on) => onSettingsChange({ ...settings, inAppTips: on })}
+        />
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-card sm:p-6">
           <h2 className="font-display text-base font-semibold text-zinc-900">Tracking setup</h2>
@@ -203,10 +236,11 @@ export function SettingsView({
               event.preventDefault();
               if (!supabase || linking) return;
               setLinking(true); setLinkError(""); setLinkNotice("");
-              const { error } = await supabase.rpc("accept_cycle_invitation", { p_code: partnerCode });
+              const { data, error } = await supabase.rpc("accept_cycle_invitation", { p_code: partnerCode });
               setLinking(false);
-              if (error) {
-                setLinkError(mapPartnerAcceptError(error.message));
+              const refused = (data as { ok?: boolean; error?: string } | null)?.ok === false ? (data as { error?: string }).error : undefined;
+              if (error || refused) {
+                setLinkError(mapPartnerAcceptError(refused ?? error?.message));
                 return;
               }
               setLinkNotice("Partner cycle linked. Your account can now view the shared cycle.");
@@ -251,6 +285,33 @@ export function SettingsView({
           <div className="mt-5 flex justify-end gap-2"><button type="button" disabled={deleting} onClick={() => { setConfirmOpen(false); setConfirmation(""); }} className="min-h-10 rounded-md border border-zinc-200 px-3 text-sm text-zinc-700">Cancel</button><button type="button" disabled={deleting || confirmation !== "DELETE"} onClick={() => void deleteAccount()} className="min-h-10 rounded-md bg-rose-700 px-3 text-sm font-medium text-white disabled:opacity-40">{deleting ? "Deleting…" : "Delete permanently"}</button></div>
         </section>
       </div>}
+    </div>
+  );
+}
+function SwitchRow({ id, icon: Icon, title, description, checked, disabled, onChange }: {
+  id: string;
+  icon: typeof Bell;
+  title: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center gap-3.5">
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors duration-300 ${checked ? "bg-[var(--period-solid)] text-white" : "bg-zinc-100 text-zinc-500"}`} aria-hidden="true">
+        <Icon className="h-5 w-5" strokeWidth={2} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 id={id} className="font-display text-[15px] font-semibold leading-tight text-zinc-900">{title}</h2>
+        <p className="mt-0.5 text-[13px] leading-snug text-zinc-500">{description}</p>
+      </div>
+      <button type="button" role="switch" aria-checked={checked} aria-labelledby={id} disabled={disabled} onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-[30px] w-[52px] shrink-0 items-center rounded-full p-[3px] shadow-[inset_0_1px_2px_rgb(0_0_0/0.18)] outline-none transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-[var(--period-solid)] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 ${checked ? "bg-[var(--period-solid)]" : "bg-zinc-300"}`}>
+        <span className={`flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-[0_1px_3px_rgb(0_0_0/0.3)] transition-transform duration-300 ease-[cubic-bezier(.3,1.4,.5,1)] ${checked ? "translate-x-[22px]" : "translate-x-0"}`}>
+          {checked && <Check className="h-3.5 w-3.5 text-[var(--period-solid)]" strokeWidth={3} />}
+        </span>
+      </button>
     </div>
   );
 }

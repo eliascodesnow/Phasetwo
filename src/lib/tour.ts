@@ -110,8 +110,8 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     id: "partner-advice",
-    title: "Partner advice",
-    body: "Tap this button to chat about more ways to support your partner through this phase.",
+    title: "Ari Knows",
+    body: "Tap Ari (bottom left) to learn what this phase can mean and get ideas to support them. Pick who you are to them first so the advice fits.",
     target: "partner-advice",
     audience: "partner",
   },

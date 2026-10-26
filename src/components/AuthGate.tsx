@@ -3,6 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { readWeeklyLoginStreak, recordWeeklyLogin } from "../lib/storage";
 import { capturePartnerCodeFromUrl } from "../lib/partnerInvite";
+import { PhaseTwoLoader } from "./PhaseTwoLoader";
 
 export function AuthGate({ children }: { children: (user: User | null, weeklyStreak: number) => ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -56,7 +57,7 @@ export function AuthGate({ children }: { children: (user: User | null, weeklyStr
   }, [user?.id]);
 
   if (!authReady) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-zinc-500">Loading PhaseTwo...</div>;
+    return <PhaseTwoLoader />;
   }
 
   return <>{children(user, weeklyStreak)}</>;

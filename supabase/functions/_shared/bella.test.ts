@@ -57,6 +57,10 @@ describe("Bella request classification and safety", () => {
     expect(isBellaPersonalDataRequest("What is endometriosis?")).toBe(false);
     expect(isBellaPersonalDataRequest("Why have my last few periods been painful?")).toBe(true);
     expect(isBellaPersonalDataRequest("What symptoms should I discuss with a doctor?")).toBe(true);
+    // Bare pronouns must not send tracking data to the AI provider (privacy policy 2.8).
+    expect(isBellaPersonalDataRequest("Tell me about PCOS")).toBe(false);
+    expect(isBellaPersonalDataRequest("Can you explain what a luteal phase is to me?")).toBe(false);
+    expect(isBellaPersonalDataRequest("Summarize my symptoms for my appointment")).toBe(true);
   });
 
   it("declines diagnosis, medication and prompt injection requests without an AI call", () => {
@@ -67,6 +71,24 @@ describe("Bella request classification and safety", () => {
 
   it("directs potentially urgent symptom reports to urgent care", () => {
     expect(getBellaSafetyResponse("I am fainting and bleeding heavily")).toContain("urgent medical attention");
+  });
+
+  it("responds to crisis statements and wider urgent-symptom wording", () => {
+    expect(getBellaSafetyResponse("I want to die")).toContain("emergency number");
+    expect(getBellaSafetyResponse("my pmdd makes me think about suicide")).toContain("988");
+    expect(getBellaSafetyResponse("I fainted at work")).toContain("urgent medical attention");
+    expect(getBellaSafetyResponse("I'm soaking a pad every hour")).toContain("urgent medical attention");
+    expect(getBellaSafetyResponse("I'm pregnant and bleeding")).toContain("urgent medical attention");
+    expect(getBellaSafetyResponse("How do I end my period faster?")).toBeNull();
+  });
+
+  it("catches hedged and named-condition diagnosis claims but not harmless text", () => {
+    expect(enforceBellaResponseSafety("You may have endometriosis.")).toContain("can't determine whether");
+    expect(enforceBellaResponseSafety("It looks like you have PCOS.")).toContain("can't determine whether");
+    expect(enforceBellaResponseSafety("Your tracking data points to endometriosis.")).toContain("can't determine whether");
+    expect(enforceBellaResponseSafety("You have a few options for tracking pain.")).toBe("You have a few options for tracking pain.");
+    expect(enforceBellaResponseSafety("Endometriosis can cause pelvic pain.")).toBe("Endometriosis can cause pelvic pain.");
+    expect(enforceBellaResponseSafety("Try 400 mg ibuprofen with food.")).toContain("can't recommend medication");
   });
 
   it("replaces model responses that make a diagnosis or give medication directions", () => {

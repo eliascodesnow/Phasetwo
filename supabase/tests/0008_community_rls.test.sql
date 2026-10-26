@@ -51,8 +51,9 @@ on conflict do nothing;
 select ok(
   (select bool_and(c.relrowsecurity)
      from pg_class c join pg_namespace n on n.oid = c.relnamespace
-    where (n.nspname = 'community_private' and c.relname = 'settings')
-       or (n.nspname = 'public' and c.relname like 'community_%')),
+    where c.relkind in ('r', 'p')
+      and ((n.nspname = 'community_private' and c.relname = 'settings')
+        or (n.nspname = 'public' and c.relname like 'community_%'))),
   'RLS is enabled on every community table'
 );
 select ok(not has_column_privilege('authenticated', 'public.community_profiles', 'user_id', 'SELECT'), 'auth user ids are not selectable from community profiles');
